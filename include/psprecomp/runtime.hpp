@@ -77,6 +77,7 @@ public:
 
     GuestMemory &memory() noexcept { return memory_; }
     const GuestMemory &memory() const noexcept { return memory_; }
+    AllegrexContext &context() noexcept { return cpu_; }
     NidRegistry &nids() noexcept;
     const NidRegistry &nids() const noexcept;
 
@@ -201,6 +202,14 @@ public:
             explicit DepthGuard(std::uint32_t &value) : depth(value) { ++depth; }
             ~DepthGuard() { --depth; }
         } guard(chain_depth_);
+        if constexpr (DirectTargetPc != 0u) ctx.pc = DirectTargetPc;
+        if constexpr (DirectTargetPc != 0u) {
+            if (const RecompiledFunction _ov = lookup_function_override(DirectTargetPc); _ov != nullptr) {
+                _ov(*this, ctx);
+                if (chain_context_invalidated_) return false;
+                return true;
+            }
+        }
         if constexpr (DirectEntryId != 0u &&
                       std::is_invocable_v<decltype(Function), Runtime &, AllegrexContext &, std::uint16_t,
                                           GuestMemory::AotFastView &>) {
@@ -281,6 +290,17 @@ private:
     // direct-chain fast path. Keeping hook/context-token work here leaves the
     // other ~4095 boundaries as a counter increment + predictable compare.
     [[nodiscard]] bool run_starvation_boundary(AllegrexContext &ctx);
+    [[nodiscard]] RecompiledFunction lookup_function_override(std::uint32_t address) const noexcept {
+        if (direct_functions_.empty()) return nullptr;
+        const std::uint32_t c = memory_.canonical(address);
+        const std::uint32_t delta = c - direct_base_;
+        if ((delta & 3u) != 0u) return nullptr;
+        const std::size_t index = static_cast<std::size_t>(delta) / 4u;
+        if (index >= direct_functions_.size()) return nullptr;
+        const RecompiledFunction fn = direct_functions_[index];
+        if (fn == nullptr || direct_chainable_[index] != nullptr) return nullptr;
+        return fn;
+    }
 
     GuestMemory memory_;
     NidRegistry nids_;

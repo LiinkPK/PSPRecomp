@@ -513,6 +513,7 @@ void Runtime::run(std::uint32_t entry, std::uint64_t max_dispatches) {
     stopped_ = false;
     stop_reason_.clear();
     cpu_.pc = entry;
+    cpu_.gpr[29] = 0x09F00000u;   // PSP user-mode stack
     load_counted_pcs();
     const bool profile_dispatch = std::getenv("PSPRECOMP_PROFILE_DISPATCH") != nullptr;
     const auto parse_environment_u64 = [](const char *name, std::uint64_t fallback = 0u) {
@@ -646,6 +647,7 @@ void Runtime::run(std::uint32_t entry, std::uint64_t max_dispatches) {
         std::uint64_t executed_dispatches = 0u;
         for (; executed_dispatches < max_dispatches && !stopped_; ++executed_dispatches) {
             const std::uint32_t before = cpu_.pc;
+            if (before == 0u) { stopped_ = true; break; }  // PSP convention: return to 0 = clean thread exit
             chain_context_invalidated_ = false;
             const std::int32_t dispatch_thread_uid = g_runtime_thread_uid;
             // Most outer dispatches are ordinary AOT PCs.  Resolve those
