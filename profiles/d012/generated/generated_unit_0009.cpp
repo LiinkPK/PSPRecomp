@@ -26314,27 +26314,15 @@ L_0893439C:
     g_pool_base = ctx.gpr[2];
     goto L_089343B4;
 L_089343B4:
-    if (g_pool_base == 0u) {
-        ctx.gpr[2] = static_cast<std::uint32_t>(-1);
-        goto L_089343F4;
-    }
-    ctx.gpr[2] = g_pool_base;
     goto L_089343C0;
 
 L_089343B8:
-    if (g_pool_base == 0u) {
-        ctx.gpr[2] = static_cast<std::uint32_t>(-1);
-        goto L_089343F4;
-    }
-    // Allocate frame & preserve callee-saved registers for fast-path entry
-    ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-16));
-    aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(0), ctx.gpr[16]);
-    aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(4), ctx.gpr[17]);
-    aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(8), ctx.gpr[18]);
-    aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(12), ctx.gpr[31]);
-    ctx.gpr[18] = ctx.gpr[4]; // Copy size (a0) -> s2
-    ctx.gpr[2] = g_pool_base;
+    ctx.gpr[29] -= 16;                           // Set up stack frame
+    aot_mem.write_u32(ctx.gpr[29] + 12, ctx.gpr[31]); // Save RA for epilogue
+    ctx.gpr[18] = ctx.gpr[4];                    // s2 = a0 (allocation size)
     goto L_089343C0;
+    goto L_089343C0;
+
 L_089343C0:
     ctx.gpr[6] = (2479u << 16u);
     ctx.gpr[5] = g_pool_cur;
@@ -26347,6 +26335,7 @@ L_089343C0:
       }
       goto L_089343D8;
     }
+    
 L_089343D8:
     ctx.gpr[11] = (2479u << 16u);
     ctx.gpr[10] = g_pool_end;

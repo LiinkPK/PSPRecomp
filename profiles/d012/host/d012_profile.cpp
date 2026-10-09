@@ -144,7 +144,12 @@ void register_hle(psprecomp::Runtime &rt) {
         [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
             ctx.gpr[2] = 0u;
         });
+        
 // Explicit HLE for CreateThread / StartThread wrapper addresses
+
+    rt.register_function(0x00000000u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+        std::printf("[HLE] Thread exited (returned to RA=0)\n");
+    }, "hle_thread_exit");
 
     rt.register_function(0x089C5F48u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
         s_alloc_size = ctx.gpr[7];
@@ -168,6 +173,7 @@ void register_hle(psprecomp::Runtime &rt) {
         ctx.pc     = ctx.gpr[31];
         std::printf("[HLE] sceKernelCreateThread entry=0x%08X\n", s_thread_entry);
     }, "hle_createthread");
+
     rt.register_function(0x089C5FA0u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
         if (s_thread_entry != 0u) {
             std::printf("[HLE] sceKernelStartThread entry=0x%08X\n", s_thread_entry);
@@ -176,6 +182,7 @@ void register_hle(psprecomp::Runtime &rt) {
             ctx.gpr[29] = 0x09EF0000u;
             ctx.gpr[26] = 0x09EE0000u;
             ctx.gpr[28] = 0x08B6B260u;
+            ctx.gpr[31] = 0x00000000u;
             ctx.gpr[2]  = 0u;
             ctx.pc      = s_thread_entry;
         } else {
