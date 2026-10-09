@@ -147,8 +147,9 @@ void register_hle(psprecomp::Runtime &rt) {
 
 // Explicit HLE for CreateThread / StartThread wrapper addresses
 
-    rt.register_function(0x00000001u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+    rt.register_function(0x00000001u, [](psprecomp::Runtime &rt, psprecomp::AllegrexContext &ctx) {
         std::printf("[HLE] Thread exited\n");
+        rt.stop("thread exited normally");
     }, "hle_thread_exit");
 
     rt.register_function(0x089C5F48u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
