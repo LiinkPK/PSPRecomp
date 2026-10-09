@@ -26231,6 +26231,9 @@ L_089342E8:
 L_08934300:
     rt.unsupported(0x08934300u, 0x0000000Du, "special? not lowered yet"); return;
 L_0893431C:
+    { static int s_call_n = 0; s_call_n++;
+      std::printf("[ALLOC_ENTRY #%d] a0=%08X base=%08X cur=%08X end=%08X\n",
+          s_call_n, ctx.gpr[4], g_pool_base, g_pool_cur, g_pool_end); }
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-16));
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(0), ctx.gpr[16]);
     ctx.gpr[16] = (2479u << 16u);
@@ -26314,10 +26317,11 @@ L_089343B4:
     ctx.gpr[2] = g_pool_base;
     goto L_089343B8;
 L_089343B8:
-    if (ctx.gpr[2] == 0u) {
-    ctx.gpr[2] = (0u + static_cast<std::uint32_t>(-1));
+    if (g_pool_base == 0u) {
+        ctx.gpr[2] = static_cast<std::uint32_t>(-1);
         goto L_089343F4;
     }
+    ctx.gpr[2] = g_pool_base;
     goto L_089343C0;
 L_089343C0:
     ctx.gpr[6] = (2479u << 16u);
