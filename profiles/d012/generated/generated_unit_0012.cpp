@@ -29384,7 +29384,9 @@ L_0899321C:
     ctx.gpr[31] = (0x08993224u);
     // nop
     ctx.pc = jump_target;
+    printf("[INIT] calling function pointer 0x%08X\n", jump_target);
     if (rt.invoke_chained_call(ctx, &aot_mem) && ctx.pc == 0x08993224u) goto L_08993224;
+    printf("[INIT] invoke_chained_call returned false for 0x%08X\n", jump_target);
     return;
 L_08993224:
     ctx.gpr[16] = (ctx.gpr[16] + static_cast<std::uint32_t>(8));
