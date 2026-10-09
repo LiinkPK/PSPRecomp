@@ -26247,12 +26247,24 @@ L_0893431C:
       goto L_08934340;
     }
 L_08934340:
-    ctx.gpr[31] = (0x0893435Cu);
-    ctx.gpr[4] = (0u + static_cast<std::uint32_t>(2));
-    ctx.gpr[5] = (0u + static_cast<std::uint32_t>(65536));
-    ctx.gpr[6] = (ctx.gpr[16] + static_cast<std::uint32_t>(688));
-    if (rt.invoke_chained_direct<&recomp_unit_0014_entry, 14u, 308u, 0x089C5FA0u>(ctx, &aot_mem) && ctx.pc == 0x0893435Cu) goto L_0893435C;
-    return;
+    ctx.gpr[3] = (0u << 16u);
+    ctx.gpr[4] = (ctx.gpr[3] + static_cast<std::uint32_t>(0));
+    { const bool branch_taken = ctx.gpr[4] == 0u;
+    ctx.gpr[17] = (1u << 16u);
+      if (branch_taken) {
+          goto L_08934368;
+      }
+      goto L_08934350;
+    }
+L_08934350:
+    ctx.gpr[7] = (aot_mem.aot_load32(ctx.gpr[3] + static_cast<std::uint32_t>(0)));
+    { const bool branch_taken = ctx.gpr[7] == 0u;
+    ctx.gpr[2] = (0u + static_cast<std::uint32_t>(-1));
+      if (branch_taken) {
+          goto L_089343F4;
+      }
+      goto L_0893435C;
+    }
 L_0893435C:
     ctx.gpr[17] = (ctx.gpr[7] << 10u);
     { const bool branch_taken = ctx.gpr[17] == 0u;
@@ -26311,10 +26323,6 @@ L_089343B4:
 L_089343B4_skip_frame:
     ctx.gpr[16] = (2479u << 16u);
     ctx.gpr[2] = g_pool_base;
-    if (ctx.gpr[2] == 0u) {
-        ctx.gpr[2] = static_cast<std::uint32_t>(-1);
-        goto L_089343F4;
-    }
     goto L_089343C0_skip_frame;
 L_089343B8:
     if (g_pool_base == 0u) {
