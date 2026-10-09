@@ -26307,11 +26307,11 @@ L_0893439C:
     g_pool_end  = ctx.gpr[7];   // ADD
     aot_mem.aot_store32(ctx.gpr[5] + static_cast<std::uint32_t>(684), ctx.gpr[2]);
     g_pool_cur  = ctx.gpr[2];   // ADD
-    ctx.gpr[2] = g_pool_base;
-    g_pool_base = ctx.gpr[2];   // ADD
+    aot_mem.aot_store32(ctx.gpr[16] + static_cast<std::uint32_t>(688), ctx.gpr[2]);
+    g_pool_base = ctx.gpr[2];
     goto L_089343B4;
 L_089343B4:
-    ctx.gpr[2] = (aot_mem.aot_load32(ctx.gpr[16] + static_cast<std::uint32_t>(688)));
+    ctx.gpr[2] = g_pool_base;
     goto L_089343B8;
 L_089343B8:
     if (ctx.gpr[2] == 0u) {
