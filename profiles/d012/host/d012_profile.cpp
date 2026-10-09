@@ -152,6 +152,16 @@ void register_hle(psprecomp::Runtime &rt) {
         rt.stop("thread exited normally");
     }, "hle_thread_exit");
 
+    rt.register_function(0x089C6000u, [](psprecomp::Runtime &rt, psprecomp::AllegrexContext &ctx) {
+        std::printf("[HLE] sceKernelExitDeleteThread(%d)\n", ctx.gpr[4]);
+        rt.stop("sceKernelExitDeleteThread");
+    }, "hle_exitdeletethread");
+
+    rt.register_function(0x089C6030u, [](psprecomp::Runtime &rt, psprecomp::AllegrexContext &ctx) {
+        std::printf("[HLE] sceKernelExitThread(%d)\n", ctx.gpr[4]);
+        rt.stop("sceKernelExitThread");
+    }, "hle_exitthread");
+
     rt.register_function(0x089C5F48u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
         s_alloc_size = ctx.gpr[7];
         std::printf("[DBG] 089C5F48: a0=%08X a3(size)=%08X s1=%08X ra=%08X\n",
