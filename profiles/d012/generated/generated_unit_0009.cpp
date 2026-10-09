@@ -26321,6 +26321,12 @@ L_089343B8:
         ctx.gpr[2] = static_cast<std::uint32_t>(-1);
         goto L_089343F4;
     }
+    ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-16));
+    aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(0), ctx.gpr[16]);
+    aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(4), ctx.gpr[17]);
+    aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(8), ctx.gpr[18]);
+    aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(12), ctx.gpr[31]);
+    ctx.gpr[18] = ctx.gpr[4];
     ctx.gpr[2] = g_pool_base;
     goto L_089343C0;
 L_089343C0:
