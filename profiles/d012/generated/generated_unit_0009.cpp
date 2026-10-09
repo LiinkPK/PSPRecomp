@@ -26325,7 +26325,11 @@ L_089343B4:
 L_089343B8:
     if (g_pool_base == 0u) {
         ctx.gpr[2] = static_cast<std::uint32_t>(-1);
-        goto L_089343F4;
+        jump_target = ctx.gpr[31];
+        local_pc = jump_target;
+        if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+        ctx.pc = jump_target;
+        return;
     }
     // Allocate frame & preserve callee-saved registers for fast-path entry
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-16));
