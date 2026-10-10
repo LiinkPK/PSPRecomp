@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PSP Recompilation Roadmap - roadmap.dissidia_recomp()</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Google Fonts: JetBrains Mono & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            tokyo: {
+              bg: '#1b1e28',
+              panel: '#232634',
+              border: '#333849',
+              hover: '#2a2e3d',
+              text: '#d8dbe6',
+              muted: '#8b90a3',
+              accent: '#7aa2f7',
+              green: '#9ece6a',
+              red: '#f7768e',
+              orange: '#e0af68',
+              purple: '#bb9af7',
+              cyan: '#7dcfff',
+            }
+          },
+          fontFamily: {
+            mono: ['"JetBrains Mono"', 'monospace'],
+            sans: ['Inter', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Custom Scrollbar for Tokyo Night theme */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #1b1e28;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #333849;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #7aa2f7;
+    }
+    
+    /* Code highlight tag style */
+    .code-tag {
+      font-family: 'JetBrains Mono', monospace;
+      color: #f7768e;
+      background: rgba(247, 118, 142, 0.12);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 0.85em;
+    }
+    
+    .glow-accent {
+      box-shadow: 0 0 15px rgba(122, 162, 247, 0.15);
+    }
+    
+    .transition-custom {
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+  </style>
+</head>
+<body class="bg-tokyo-bg text-tokyo-text font-mono min-h-screen pb-16 selection:bg-tokyo-accent selection:text-tokyo-bg">
+
+  <!-- Top Navigation & Sticky Header Bar -->
+  <header class="sticky top-0 z-40 bg-tokyo-bg/90 backdrop-blur-md border-b border-tokyo-border px-4 py-3">
+    <div class="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div class="flex items-center space-x-3">
+        <div class="flex space-x-1.5">
+          <span class="w-3 h-3 rounded-full bg-tokyo-red inline-block"></span>
+          <span class="w-3 h-3 rounded-full bg-tokyo-orange inline-block"></span>
+          <span class="w-3 h-3 rounded-full bg-tokyo-green inline-block"></span>
+        </div>
+        <span class="text-xs text-tokyo-muted border-l border-tokyo-border pl-3">PSP · HLE · RECOMPILATION</span>
+        <h1 class="text-sm md:text-base font-bold text-white tracking-wide flex items-center gap-1">
+          <span class="text-tokyo-purple">roadmap</span>.<span class="text-tokyo-accent">dissidia_recomp</span>()
+        </h1>
+      </div>
+
+      <!-- Quick Nav Links -->
+      <div class="flex items-center space-x-2 text-xs overflow-x-auto pb-1 md:pb-0">
+        <button onclick="scrollToId('phase-1')" class="hover:text-tokyo-accent px-2 py-1 rounded bg-tokyo-panel border border-tokyo-border whitespace-nowrap">Phase 1</button>
+        <button onclick="scrollToId('phase-2')" class="hover:text-tokyo-green px-2 py-1 rounded bg-tokyo-panel border border-tokyo-border whitespace-nowrap">Phase 2</button>
+        <button onclick="scrollToId('phase-3')" class="hover:text-tokyo-orange px-2 py-1 rounded bg-tokyo-panel border border-tokyo-border whitespace-nowrap">Phase 3</button>
+        <button onclick="scrollToId('phase-4')" class="hover:text-tokyo-purple px-2 py-1 rounded bg-tokyo-panel border border-tokyo-border whitespace-nowrap">Phase 4</button>
+        <button onclick="scrollToId('phase-5')" class="hover:text-tokyo-red px-2 py-1 rounded bg-tokyo-panel border border-tokyo-border whitespace-nowrap">Phase 5</button>
+        <button onclick="scrollToId('shortcut')" class="hover:text-tokyo-cyan px-2 py-1 rounded bg-tokyo-panel border border-tokyo-border text-tokyo-cyan whitespace-nowrap"><i class="fa-solid fa-bolt mr-1"></i>Shortcut</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 pt-6 space-y-6">
+
+    <!-- Hero / Console Terminal Banner -->
+    <section class="bg-tokyo-panel border border-tokyo-border rounded-lg p-5 relative overflow-hidden glow-accent">
+      <div class="absolute -top-12 -right-12 w-48 h-48 bg-tokyo-accent/10 rounded-full blur-2xl pointer-events-none"></div>
+      <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
+        <div>
+          <div class="text-xs text-tokyo-accent font-semibold tracking-wider uppercase mb-1">Interactive Dev Tracker</div>
+          <h2 class="text-xl md:text-2xl font-bold text-white">Dissidia 012 Recompilation Roadmap</h2>
+          <p class="text-xs md:text-sm text-tokyo-muted mt-1">// Phased HLE implementation plan: Threads → File I/O → GE Graphics → Audio → Input</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="expandAll()" class="text-xs bg-tokyo-bg hover:bg-tokyo-hover border border-tokyo-border text-tokyo-text px-3 py-1.5 rounded transition-custom flex items-center gap-1.5">
+            <i class="fa-solid fa-angles-down"></i> Expand All
+          </button>
+          <button onclick="collapseAll()" class="text-xs bg-tokyo-bg hover:bg-tokyo-hover border border-tokyo-border text-tokyo-text px-3 py-1.5 rounded transition-custom flex items-center gap-1.5">
+            <i class="fa-solid fa-angles-up"></i> Collapse
+          </button>
+          <button onclick="resetProgress()" class="text-xs bg-tokyo-red/10 border border-tokyo-red/40 hover:bg-tokyo-red/20 text-tokyo-red px-3 py-1.5 rounded transition-custom flex items-center gap-1.5">
+            <i class="fa-solid fa-rotate-left"></i> Reset
+          </button>
+        </div>
+      </div>
+
+      <!-- Overall Progress Card -->
+      <div class="bg-tokyo-bg/70 border border-tokyo-border/80 rounded-md p-4">
+        <div class="flex justify-between items-center mb-2">
+          <span class="text-sm font-semibold text-tokyo-text flex items-center gap-2">
+            <i class="fa-solid fa-list-check text-tokyo-accent"></i> Overall Recompilation Progress
+          </span>
+          <span id="overall-percentage" class="text-lg font-bold text-tokyo-green">0%</span>
+        </div>
+        
+        <!-- Progress Bar -->
+        <div class="w-full h-3 bg-tokyo-panel rounded-full overflow-hidden border border-tokyo-border">
+          <div id="overall-progress-bar" class="h-full bg-gradient-to-r from-tokyo-accent via-tokyo-purple to-tokyo-green transition-all duration-500 ease-out" style="width: 0%"></div>
+        </div>
+
+        <div class="flex justify-between items-center mt-3 text-xs text-tokyo-muted">
+          <span id="tasks-count-summary">0 / 0 Sub-tasks completed</span>
+          <span id="phases-count-summary">0 / 5 Phases completed</span>
+        </div>
+      </div>
+
+      <!-- Command Prompt CLI Snippet -->
+      <div class="mt-4 bg-black/40 rounded p-3 text-xs border border-tokyo-border/50 text-tokyo-text flex items-center justify-between overflow-x-auto">
+        <code>
+          <span class="text-tokyo-purple">$</span> psprecomp --game <span class="text-tokyo-orange">"Dissidia 012"</span> --phases <span class="text-tokyo-green">5</span>
+        </code>
+        <span class="text-[10px] text-tokyo-muted bg-tokyo-panel px-2 py-0.5 rounded border border-tokyo-border">CLI Toolchain v1.2</span>
+      </div>
+    </section>
+
+    <!-- Filters and View Toggles -->
+    <section class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-tokyo-panel/50 border border-tokyo-border p-3 rounded-lg">
+      <div class="flex items-center space-x-2 text-xs">
+        <span class="text-tokyo-muted mr-1"><i class="fa-solid fa-filter"></i> Filter Tasks:</span>
+        <button id="filter-all" onclick="setFilter('all')" class="filter-btn active px-3 py-1 rounded bg-tokyo-accent text-tokyo-bg font-semibold transition-custom">All</button>
+        <button id="filter-pending" onclick="setFilter('pending')" class="filter-btn px-3 py-1 rounded bg-tokyo-panel border border-tokyo-border text-tokyo-text hover:bg-tokyo-hover transition-custom">Pending</button>
+        <button id="filter-completed" onclick="setFilter('completed')" class="filter-btn px-3 py-1 rounded bg-tokyo-panel border border-tokyo-border text-tokyo-text hover:bg-tokyo-hover transition-custom">Completed</button>
+      </div>
+
+      <div class="text-xs text-tokyo-muted flex items-center gap-1.5">
+        <i class="fa-solid fa-circle-info text-tokyo-cyan"></i>
+        <span>Click <strong>"Complete Phase"</strong> or individual checkboxes to advance.</span>
+      </div>
+    </section>
+
+    <!-- PHASES CONTAINER -->
+    <div id="phases-list" class="space-y-5">
+      <!-- Dynamic rendering via JS or hardcoded templates enhanced by JS state -->
+    </div>
+
+    <!-- THE SHORTCUT CALLOUT SECTION -->
+    <section id="shortcut" class="bg-gradient-to-r from-tokyo-panel to-tokyo-panel/80 border-l-4 border-l-tokyo-orange border-y border-r border-tokyo-border rounded-r-lg p-5 shadow-lg">
+      <div class="flex items-center gap-2 mb-2 text-tokyo-orange font-bold text-sm">
+        <i class="fa-solid fa-lightbulb text-base"></i>
+        <span>THE SHORTCUT FOR DISSIDIA SPECIFICALLY</span>
+      </div>
+      <p class="text-xs md:text-sm text-tokyo-text leading-relaxed">
+        <strong class="text-tokyo-accent">Pro Tip:</strong> Once Phase 2 (File I/O) is working, the game will likely run all its initialization code and reach the GE display list submission. At that point, the output is just a memory buffer—you can dump it and compare against <span class="code-tag">PPSSPP</span> frame-by-frame to validate your GE interpreter <em>before you write a single line of Vulkan code</em>!
+      </p>
+    </section>
+
+    <!-- MOST REUSABLE EXISTING WORK REFERENCES -->
+    <section class="bg-tokyo-panel border border-tokyo-border rounded-lg p-5">
+      <h3 class="text-sm font-bold text-white uppercase tracking-wider mb-4 flex items-center gap-2 border-b border-tokyo-border pb-2">
+        <i class="fa-solid fa-code-fork text-tokyo-purple"></i> Most Reusable Existing Work & Resources
+      </h3>
+      
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+        <!-- OceanCrab -->
+        <a href="https://github.com/santiagoarce-rgb/OceanCrab" target="_blank" rel="noopener noreferrer" class="p-3 bg-tokyo-bg/60 border border-tokyo-border rounded hover:border-tokyo-accent transition-custom group">
+          <div class="flex items-center justify-between text-tokyo-accent font-semibold mb-1 group-hover:underline">
+            <span><i class="fa-brands fa-github mr-1"></i> OceanCrab</span>
+            <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+          </div>
+          <p class="text-tokyo-muted">SpongeBob PSP, uses PSPRecomp (same toolchain as yours). Most directly relevant reference.</p>
+        </a>
+
+        <!-- psp-web-recomp -->
+        <a href="https://github.com/snuri00/psp-web-recomp" target="_blank" rel="noopener noreferrer" class="p-3 bg-tokyo-bg/60 border border-tokyo-border rounded hover:border-tokyo-green transition-custom group">
+          <div class="flex items-center justify-between text-tokyo-green font-semibold mb-1 group-hover:underline">
+            <span><i class="fa-brands fa-github mr-1"></i> psp-web-recomp</span>
+            <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+          </div>
+          <p class="text-tokyo-muted">Most complete HLE layer available (threads, memory, file I/O, save data, controller, audio, movie skipping).</p>
+        </a>
+
+        <!-- AljandrOrtega -->
+        <a href="https://github.com/AljandrOrtega/PSP-recompilation-project" target="_blank" rel="noopener noreferrer" class="p-3 bg-tokyo-bg/60 border border-tokyo-border rounded hover:border-tokyo-orange transition-custom group">
+          <div class="flex items-center justify-between text-tokyo-orange font-semibold mb-1 group-hover:underline">
+            <span><i class="fa-brands fa-github mr-1"></i> AljandrOrtega Renderer</span>
+            <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+          </div>
+          <p class="text-tokyo-muted">SDL3 + Vulkan renderer built from scratch (MIT). Excellent reference for GE command translation.</p>
+        </a>
+
+        <!-- nakagawa-recomp -->
+        <a href="https://github.com/Jstar269/nakagawa-recomp/pull/552" target="_blank" rel="noopener noreferrer" class="p-3 bg-tokyo-bg/60 border border-tokyo-border rounded hover:border-tokyo-purple transition-custom group">
+          <div class="flex items-center justify-between text-tokyo-purple font-semibold mb-1 group-hover:underline">
+            <span><i class="fa-brands fa-github mr-1"></i> nakagawa-recomp</span>
+            <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+          </div>
+          <p class="text-tokyo-muted">PAC-MAN CE reached main menu, demonstrates useful NID aliasing pattern.</p>
+        </a>
+
+        <!-- Architecture Doc -->
+        <a href="https://github.com/sp00nznet/psprecomp/blob/main/docs/ARCHITECTURE.md" target="_blank" rel="noopener noreferrer" class="md:col-span-2 p-3 bg-tokyo-bg/60 border border-tokyo-border rounded hover:border-tokyo-cyan transition-custom group">
+          <div class="flex items-center justify-between text-tokyo-cyan font-semibold mb-1 group-hover:underline">
+            <span><i class="fa-solid fa-book mr-1"></i> PSPRecomp Architecture Documentation</span>
+            <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+          </div>
+          <p class="text-tokyo-muted">Official architecture spec detailing host function dispatching and static recompilation pipeline.</p>
+        </a>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- JavaScript Application Logic -->
+  <script>
+    // Data Structure for the PSP Recompilation Roadmap
+    const roadmapData = [
+      {
+        id: "phase-1",
+        number: "1",
+        title: "Thread/Kernel Bootstrap",
+        tagline: "Foundation & System Memory Setup",
+        status: "In Progress",
+        themeColor: "accent", // accent blue
+        borderColor: "border-l-tokyo-accent",
+        badgeBg: "bg-tokyo-accent/15 text-tokyo-accent border-tokyo-accent/30",
+        summary: "Initialize core thread scheduling, memory allocation, and basic OS callbacks.",
+        tasks: [
+          { id: "p1-t1", name: "sceKernelCreateThread, StartThread, ExitThread, GetThreadId", note: "Basic thread lifecycle mechanics" },
+          { id: "p1-t2", name: "sceKernelAllocPartitionMemory / GetBlockHeadAddr", note: "Heap memory allocation" },
+          { id: "p1-t3", name: "sceKernelSetCompiledSdkVersion variants", note: "Can simple return 0" },
+          { id: "p1-t4", name: "sceKernelGetSystemTimeLow", note: "Return host system clock tick" },
+          { id: "p1-t5", name: "sceKernelCreateCallback, semaphores, event flags", note: "Synchronization primitives" }
+        ]
+      },
+      {
+        id: "phase-2",
+        number: "2",
+        title: "File I/O",
+        tagline: "Asset Loading & ISO File Access",
+        status: "Pending",
+        themeColor: "green",
+        borderColor: "border-l-tokyo-green",
+        badgeBg: "bg-tokyo-green/15 text-tokyo-green border-tokyo-green/30",
+        summary: "Unlocks asset loading and bypasses early initialization crashes.",
+        tasks: [
+          { id: "p2-t1", name: "sceIoOpen, sceIoRead, sceIoClose, sceIoLseek", note: "Standard PSP file system primitives" },
+          { id: "p2-t2", name: "Map PSP file paths (disc0:/PSP_GAME/USRDIR/)", note: "Map PSP Virtual Paths to local directory structure" },
+          { id: "p2-t3", name: "Bypass early asset crashes", note: "Validate game reads texture & data archives without hanging" }
+        ]
+      },
+      {
+        id: "phase-3",
+        number: "3",
+        title: "Graphics (GE Processor)",
+        tagline: "Display Lists & Render Translation",
+        status: "Pending",
+        themeColor: "orange",
+        borderColor: "border-l-tokyo-orange",
+        badgeBg: "bg-tokyo-orange/15 text-tokyo-orange border-tokyo-orange/30",
+        summary: "The main challenge: Parse PSP GE display lists and translate to host draw calls.",
+        tasks: [
+          { id: "p3-t1", name: "Understand sceGu calls as recompiled MIPS code", note: "Game code builds display lists directly in RAM" },
+          { id: "p3-t2", name: "Emulate GE Command Processor", note: "Parse RAM display list packets" },
+          { id: "p3-t3", name: "Translate Display Lists to Vulkan / DX12 / OpenGL", note: "Map PSP matrices, vertices, & textures to host pipeline" },
+          { id: "p3-t4", name: "Validate GE Interpreter against PPSSPP frame dumps", note: "Dump buffer before writing full Vulkan backend" }
+        ]
+      },
+      {
+        id: "phase-4",
+        number: "4",
+        title: "Audio Engine",
+        tagline: "PCM Streams & Voice Synthesis",
+        status: "Pending",
+        themeColor: "purple",
+        borderColor: "border-l-tokyo-purple",
+        badgeBg: "bg-tokyo-purple/15 text-tokyo-purple border-tokyo-purple/30",
+        summary: "Synthesize background music and sound effects using host audio backends.",
+        tasks: [
+          { id: "p4-t1", name: "sceAudio raw PCM output", note: "Output raw audio using SDL2 / miniaudio" },
+          { id: "p4-t2", name: "sceSasCore 32-channel ADPCM/ADSR mixer", note: "Use uOFW clean reference implementation" },
+          { id: "p4-t3", name: "ATRAC3+ music streaming / stubbing", note: "Stub to silence initially, decode using libatrac3plus later" }
+        ]
+      },
+      {
+        id: "phase-5",
+        number: "5",
+        title: "Input Subsystem",
+        tagline: "Controller & Button Mapping",
+        status: "Pending",
+        themeColor: "red",
+        borderColor: "border-l-tokyo-red",
+        badgeBg: "bg-tokyo-red/15 text-tokyo-red border-tokyo-red/30",
+        summary: "Read gamepad states and map host inputs back into PSP pad buffers.",
+        tasks: [
+          { id: "p5-t1", name: "sceCtrlReadBufferPositive hook", note: "Intercept input polling calls" },
+          { id: "p5-t2", name: "Map SDL2 / XInput gamepad buttons to PSP bits", note: "D-Pad, Analog Stick, Face buttons, & Triggers" }
+        ]
+      }
+    ];
+
+    // LocalStorage State Key
+    const STORAGE_KEY = 'dissidia_recomp_progress_v2';
+
+    // State Variables
+    let taskState = {};
+    let expandedPhases = {
+      'phase-1': true,
+      'phase-2': true,
+      'phase-3': true,
+      'phase-4': true,
+      'phase-5': true
+    };
+    let currentFilter = 'all';
+
+    // Initialize State
+    function init() {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        try {
+          taskState = JSON.parse(saved);
+        } catch(e) {
+          taskState = {};
+        }
+      } else {
+        // Default state: initial setup
+        taskState = {};
+      }
+      renderPhases();
+      updateGlobalProgress();
+    }
+
+    // Save State
+    function saveState() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(taskState));
+      updateGlobalProgress();
+    }
+
+    // Render All Phases
+    function renderPhases() {
+      const container = document.getElementById('phases-list');
+      container.innerHTML = '';
+
+      roadmapData.forEach(phase => {
+        const isExpanded = expandedPhases[phase.id] !== false;
+        const completedTasks = phase.tasks.filter(t => taskState[t.id]).length;
+        const totalTasks = phase.tasks.length;
+        const phasePercent = Math.round((completedTasks / totalTasks) * 100);
+        const isFullyCompleted = completedTasks === totalTasks && totalTasks > 0;
+
+        // Filter Logic
+        if (currentFilter === 'pending' && isFullyCompleted) return;
+        if (currentFilter === 'completed' && !isFullyCompleted) return;
+
+        // Phase Status Badge
+        let statusBadgeHTML = '';
+        if (isFullyCompleted) {
+          statusBadgeHTML = `<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-tokyo-green/20 text-tokyo-green border border-tokyo-green/40 flex items-center gap-1"><i class="fa-solid fa-circle-check"></i> Completed</span>`;
+        } else if (completedTasks > 0) {
+          statusBadgeHTML = `<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-tokyo-accent/20 text-tokyo-accent border border-tokyo-accent/40 flex items-center gap-1"><i class="fa-solid fa-spinner fa-spin text-[10px]"></i> In Progress</span>`;
+        } else {
+          statusBadgeHTML = `<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-tokyo-border text-tokyo-muted border border-tokyo-border flex items-center gap-1"><i class="fa-regular fa-circle"></i> Pending</span>`;
+        }
+
+        const phaseEl = document.createElement('div');
+        phaseEl.className = `bg-tokyo-panel border border-tokyo-border border-l-4 ${phase.borderColor} rounded-lg overflow-hidden transition-custom`;
+        phaseEl.id = phase.id;
+
+        phaseEl.innerHTML = `
+          <!-- Phase Header Bar -->
+          <div class="p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 cursor-pointer select-none bg-tokyo-panel hover:bg-tokyo-hover/50 transition-custom" onclick="togglePhase('${phase.id}')">
+            <div class="flex items-start md:items-center space-x-3">
+              <button class="text-tokyo-muted hover:text-white transition-custom mt-0.5 md:mt-0">
+                <i class="fa-solid ${isExpanded ? 'fa-chevron-down' : 'fa-chevron-right'}"></i>
+              </button>
+              <div>
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="text-xs font-bold text-tokyo-muted">PHASE ${phase.number}</span>
+                  <h3 class="text-base font-bold text-white">${phase.title}</h3>
+                  ${statusBadgeHTML}
+                </div>
+                <p class="text-xs text-tokyo-muted mt-0.5">// ${phase.tagline}</p>
+              </div>
+            </div>
+
+            <!-- Header Controls & Progress Indicator -->
+            <div class="flex items-center justify-between md:justify-end space-x-4 pl-7 md:pl-0" onclick="event.stopPropagation()">
+              <div class="text-right">
+                <div class="text-xs font-bold text-tokyo-text">${completedTasks} / ${totalTasks} Done</div>
+                <div class="w-24 h-1.5 bg-tokyo-bg rounded-full overflow-hidden mt-1 border border-tokyo-border">
+                  <div class="h-full bg-tokyo-${phase.themeColor}" style="width: ${phasePercent}%"></div>
+                </div>
+              </div>
+
+              <!-- Quick Mark All Complete Button -->
+              <button onclick="toggleAllPhaseTasks('${phase.id}')" class="text-xs px-3 py-1.5 rounded border ${isFullyCompleted ? 'bg-tokyo-green/20 text-tokyo-green border-tokyo-green/50' : 'bg-tokyo-bg text-tokyo-text border-tokyo-border hover:bg-tokyo-hover'} transition-custom flex items-center gap-1">
+                <i class="fa-solid ${isFullyCompleted ? 'fa-square-check' : 'fa-check'}"></i>
+                <span>${isFullyCompleted ? 'Completed' : 'Complete Phase'}</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Phase Body Content -->
+          ${isExpanded ? `
+            <div class="px-4 pb-4 pt-2 border-t border-tokyo-border/60 bg-tokyo-bg/30">
+              <p class="text-xs text-tokyo-muted mb-3 italic">${phase.summary}</p>
+              <div class="space-y-2">
+                ${phase.tasks.map(task => {
+                  const isChecked = !!taskState[task.id];
+                  return `
+                    <div onclick="toggleTask('${task.id}')" class="group flex items-start space-x-3 p-2.5 rounded bg-tokyo-bg/70 hover:bg-tokyo-hover/80 border border-tokyo-border/80 transition-custom cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        id="${task.id}" 
+                        ${isChecked ? 'checked' : ''} 
+                        onclick="event.stopPropagation(); toggleTask('${task.id}')"
+                        class="mt-0.5 h-4 w-4 rounded bg-tokyo-panel border-tokyo-border text-tokyo-accent focus:ring-0 focus:ring-offset-0 cursor-pointer accent-tokyo-accent"
+                      >
+                      <div class="flex-1 text-xs">
+                        <label for="${task.id}" class="font-medium text-tokyo-text cursor-pointer group-hover:text-white ${isChecked ? 'line-through text-tokyo-muted' : ''}">
+                          ${formatTaskText(task.name)}
+                        </label>
+                        <p class="text-[11px] text-tokyo-muted mt-0.5">${task.note}</p>
+                      </div>
+                      ${isChecked ? '<span class="text-tokyo-green text-xs"><i class="fa-solid fa-check"></i></span>' : ''}
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          ` : ''}
+        `;
+
+        container.appendChild(phaseEl);
+      });
+    }
+
+    // Helper to style C/C++ functions inside code spans
+    function formatTaskText(text) {
+      // Look for function names or code-like keywords
+      return text.replace(/([a-zA-Z0-9_]+(?=\())/g, '<span class="code-tag">$1</span>')
+                 .replace(/(disc0:\/[^\s]+)/g, '<code class="text-tokyo-orange">$1</code>');
+    }
+
+    // Toggle Task State
+    function toggleTask(taskId) {
+      taskState[taskId] = !taskState[taskId];
+      saveState();
+      renderPhases();
+    }
+
+    // Toggle All Tasks in Phase
+    function toggleAllPhaseTasks(phaseId) {
+      const phase = roadmapData.find(p => p.id === phaseId);
+      if (!phase) return;
+
+      const allCompleted = phase.tasks.every(t => taskState[t.id]);
+      phase.tasks.forEach(t => {
+        taskState[t.id] = !allCompleted;
+      });
+
+      saveState();
+      renderPhases();
+    }
+
+    // Toggle Phase Collapse/Expand
+    function togglePhase(phaseId) {
+      expandedPhases[phaseId] = !expandedPhases[phaseId];
+      renderPhases();
+    }
+
+    function expandAll() {
+      roadmapData.forEach(p => expandedPhases[p.id] = true);
+      renderPhases();
+    }
+
+    function collapseAll() {
+      roadmapData.forEach(p => expandedPhases[p.id] = false);
+      renderPhases();
+    }
+
+    // Reset Progress
+    function resetProgress() {
+      if (confirm("Are you sure you want to reset all completion progress?")) {
+        taskState = {};
+        saveState();
+        renderPhases();
+      }
+    }
+
+    // Set Filter View
+    function setFilter(filter) {
+      currentFilter = filter;
+      document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.classList.remove('bg-tokyo-accent', 'text-tokyo-bg', 'font-semibold');
+        btn.classList.add('bg-tokyo-panel', 'text-tokyo-text');
+      });
+
+      const activeBtn = document.getElementById(`filter-${filter}`);
+      if (activeBtn) {
+        activeBtn.classList.remove('bg-tokyo-panel', 'text-tokyo-text');
+        activeBtn.classList.add('bg-tokyo-accent', 'text-tokyo-bg', 'font-semibold');
+      }
+
+      renderPhases();
+    }
+
+    // Scroll to section smoothly
+    function scrollToId(id) {
+      const el = document.getElementById(id);
+      if (el) {
+        // If phase is collapsed, auto expand it
+        if (expandedPhases[id] === false) {
+          expandedPhases[id] = true;
+          renderPhases();
+        }
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+
+    // Calculate Global Progress Summary
+    function updateGlobalProgress() {
+      let totalTasks = 0;
+      let completedTasks = 0;
+      let completedPhases = 0;
+
+      roadmapData.forEach(phase => {
+        totalTasks += phase.tasks.length;
+        const phaseDone = phase.tasks.filter(t => taskState[t.id]).length;
+        completedTasks += phaseDone;
+        if (phaseDone === phase.tasks.length && phase.tasks.length > 0) {
+          completedPhases++;
+        }
+      });
+
+      const overallPercent = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+      // Update UI elements
+      document.getElementById('overall-percentage').textContent = `${overallPercent}%`;
+      document.getElementById('overall-progress-bar').style.width = `${overallPercent}%`;
+      document.getElementById('tasks-count-summary').textContent = `${completedTasks} / ${totalTasks} Sub-tasks completed`;
+      document.getElementById('phases-count-summary').textContent = `${completedPhases} / ${roadmapData.length} Phases completed`;
+    }
+
+    // Initialize application on load
+    window.onload = function() {
+      init();
+    };
+  </script>
+</body>
+</html>

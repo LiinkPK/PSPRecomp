@@ -1,6 +1,8 @@
 #include "psprecomp/runtime.hpp"
 #include "generated_units.hpp"
+#include "d012_profile.hpp"
 #include <bit>
+#include <cstdio>
 #include <cmath>
 #include <cstdint>
 #include <limits>
@@ -5028,13 +5030,15 @@ L_089C5F40:
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     ctx.pc = jump_target;
     return;
-L_089C5F48:
+L_089C5F48: {
+    const std::uint32_t _uid = d012::hle_alloc(ctx.gpr[7]);
+    ctx.gpr[2] = _uid ? _uid : ~0u;
     jump_target = ctx.gpr[31];
-    // nop
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     ctx.pc = jump_target;
     return;
+}
 L_089C5F50:
     jump_target = ctx.gpr[31];
     // nop
@@ -5042,13 +5046,16 @@ L_089C5F50:
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     ctx.pc = jump_target;
     return;
-L_089C5F58:
+L_089C5F58: {
+    const std::uint32_t _uid58 = ctx.gpr[4];
+    ctx.gpr[2]  = d012::hle_get_addr(_uid58);
+    ctx.gpr[17] = d012::hle_alloc_size();
     jump_target = ctx.gpr[31];
-    // nop
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     ctx.pc = jump_target;
     return;
+}
 L_089C5F60:
     jump_target = ctx.gpr[31];
     // nop

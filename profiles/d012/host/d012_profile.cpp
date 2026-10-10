@@ -23,6 +23,14 @@ static std::unordered_map<
 static std::uint32_t s_thread_entry = 0u;
 static std::uint32_t s_alloc_size = 0u;
 
+// SysMem partition allocator — bump allocator in upper RAM
+static constexpr std::uint32_t kHeapBase = 0x09C00000u;
+static constexpr std::uint32_t kHeapEnd  = 0x09EE0000u;
+static std::uint32_t s_heap_next = kHeapBase;
+struct MemBlock { std::uint32_t addr; std::uint32_t size; };
+static std::unordered_map<std::uint32_t, MemBlock> s_mem_blocks;
+static std::uint32_t s_next_uid = 1u;
+
 // Single raw-function-pointer registered for every discovered syscall stub.
 // Dispatches by ctx.pc at call time.
 void generic_stub(psprecomp::Runtime &rt, psprecomp::AllegrexContext &ctx) {
@@ -58,6 +66,7 @@ void generic_stub(psprecomp::Runtime &rt, psprecomp::AllegrexContext &ctx) {
         ctx.gpr[4]  = a1;            // thread a0 = arglen
         ctx.gpr[5]  = a2;            // thread a1 = argp
         ctx.gpr[29] = 0x09EF0000u;  // fresh thread stack
+        rt.memory().store32(0x09EF7BFCu, 0x00000001u);
         ctx.gpr[2]  = 0u;
         ctx.pc      = s_thread_entry;
         return;
@@ -137,19 +146,60 @@ void scan_and_register_stubs(psprecomp::Runtime &rt, const psprecomp::Elf32Image
 void register_hle(psprecomp::Runtime &rt) {
     psprecomp::g_runtime_starvation_interval_fast = 0u;
     rt.register_hle("IoFileMgrForUser", 0x109F50BC,
-        [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+        [](psprecomp::Runtime &rt, psprecomp::AllegrexContext &ctx) {
+            const std::string path = rt.memory().read_c_string(ctx.gpr[4]);
+            std::printf("[HLE] sceIoOpen: \"%s\" flags=0x%X mode=0x%X\n", path.c_str(), ctx.gpr[5], ctx.gpr[6]);
+            std::fflush(stdout);
             ctx.gpr[2] = static_cast<std::uint32_t>(-1);
         });
     rt.register_hle("IoFileMgrForUser", 0x810C4BC3,
         [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
             ctx.gpr[2] = 0u;
         });
+    rt.register_hle("ThreadManForUser", 0x616403BA,
+        [](psprecomp::Runtime &rt, psprecomp::AllegrexContext &ctx) {
+            std::printf("[HLE] sceKernelTerminateThread a0=0x%08X\n", ctx.gpr[4]);
+            std::fflush(stdout);
+            rt.stop("sceKernelTerminateThread");
+        });
+    rt.register_hle("SysMemUserForUser", 0xA6B0FB36,
+        [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+            const std::uint32_t size = ctx.gpr[7];
+            const std::uint32_t addr = (s_heap_next + 63u) & ~63u;
+            if (addr + size > kHeapEnd) { ctx.gpr[2] = ~0u; ctx.pc = ctx.gpr[31]; return; }
+            const std::uint32_t uid = s_next_uid++;
+            s_mem_blocks[uid] = {addr, size};
+            s_heap_next = addr + size;
+            std::printf("[HLE] sceKernelAllocPartitionMemory size=0x%X -> uid=%u addr=0x%08X\n", size, uid, addr);
+            ctx.gpr[2] = uid;
+            ctx.pc = ctx.gpr[31];
+        });
+    rt.register_hle("SysMemUserForUser", 0x9D9A5392,
+        [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+            auto it = s_mem_blocks.find(ctx.gpr[4]);
+            ctx.gpr[2] = (it != s_mem_blocks.end()) ? it->second.addr : 0u;
+            ctx.pc = ctx.gpr[31];
+        });
+    rt.register_hle("SysMemUserForUser", 0xB6D61D02,
+        [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+            s_mem_blocks.erase(ctx.gpr[4]);
+            ctx.gpr[2] = 0u;
+            ctx.pc = ctx.gpr[31];
+        });
 
 // Explicit HLE for CreateThread / StartThread wrapper addresses
 
+    rt.register_function(0x00000000u, [](psprecomp::Runtime &rt, psprecomp::AllegrexContext &ctx) {
+        std::printf("[HLE] null_fptr_stub: ra=0x%08X a0=0x%08X\n", ctx.gpr[31], ctx.gpr[4]);
+        if (ctx.gpr[31] == 0u) { rt.stop("thread exited normally"); return; }
+        ctx.pc = ctx.gpr[31];
+    }, "null_fptr_stub");
     rt.register_function(0x00000001u, [](psprecomp::Runtime &rt, psprecomp::AllegrexContext &ctx) {
-        std::printf("[HLE] Thread exited\n");
-        rt.stop("thread exited normally");
+        std::printf("[HLE] sentinel hit ra=0x%08X pc=0x%08X\n", ctx.gpr[31], ctx.pc);
+        std::fflush(stdout);
+        if (ctx.gpr[31] == 0x00000001u || ctx.gpr[31] == 0u) {
+            rt.stop("thread exited normally");
+        }
     }, "hle_thread_exit");
 
     rt.register_function(0x089C6000u, [](psprecomp::Runtime &rt, psprecomp::AllegrexContext &ctx) {
@@ -162,21 +212,6 @@ void register_hle(psprecomp::Runtime &rt) {
         rt.stop("sceKernelExitThread");
     }, "hle_exitthread");
 
-    rt.register_function(0x089C5F48u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
-        s_alloc_size = ctx.gpr[7];
-        std::printf("[DBG] 089C5F48: a0=%08X a3(size)=%08X s1=%08X ra=%08X\n",
-            ctx.gpr[4], ctx.gpr[7], ctx.gpr[17], ctx.gpr[31]);
-        ctx.gpr[2] = 1u;
-        ctx.pc = ctx.gpr[31];
-    }, "dbg_stub_48");
-
-    rt.register_function(0x089C5F58u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
-        std::printf("[DBG] 089C5F58: a0=%08X s1_before=%08X ra=%08X\n",
-            ctx.gpr[4], ctx.gpr[17], ctx.gpr[31]);
-        ctx.gpr[17] = s_alloc_size;   // restore s1 = pool size for L_0893439C
-        ctx.gpr[2] = 0x09C00000u;
-        ctx.pc = ctx.gpr[31];
-    }, "dbg_stub_58");
 
     rt.register_function(0x089C5FD0u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
         s_thread_entry = ctx.gpr[5];
@@ -185,7 +220,7 @@ void register_hle(psprecomp::Runtime &rt) {
         std::printf("[HLE] sceKernelCreateThread entry=0x%08X\n", s_thread_entry);
     }, "hle_createthread");
 
-    rt.register_function(0x089C5FA0u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+    rt.register_function(0x089C5FA0u, [](psprecomp::Runtime &rt, psprecomp::AllegrexContext &ctx) {
         if (s_thread_entry != 0u) {
             std::printf("[HLE] sceKernelStartThread entry=0x%08X\n", s_thread_entry);
             ctx.gpr[4]  = ctx.gpr[5];
@@ -195,12 +230,38 @@ void register_hle(psprecomp::Runtime &rt) {
             ctx.gpr[28] = 0x08B6B260u;
             ctx.gpr[31] = 0x00000001u;
             ctx.gpr[2]  = 0u;
+            // Pre-seed sentinel at the bottom of the thread stack so any
+            // function that loads ra from sp+offset gets a valid exit address.
+            rt.memory().store32(0x09EF7BFCu, 0x00000001u);
             ctx.pc      = s_thread_entry;
         } else {
             ctx.gpr[2] = 0u;
             ctx.pc     = ctx.gpr[31];
         }
     }, "hle_startthread");
+}
+
+static std::uint32_t s_last_addr = 0u;
+static std::uint32_t s_last_uid  = 0u;
+
+std::uint32_t hle_alloc(std::uint32_t size) {
+    const std::uint32_t addr = (s_heap_next + 63u) & ~63u;
+    if (addr + size > kHeapEnd) return 0u;
+    const std::uint32_t uid = s_next_uid++;
+    s_mem_blocks[uid] = {addr, size};
+    s_alloc_size = size;
+    s_last_addr  = addr;
+    s_last_uid   = uid;
+    s_heap_next  = addr + size;
+    std::printf("[HLE] AllocPartitionMemory size=0x%X -> uid=%u addr=0x%08X\n", size, uid, addr);
+    return uid;
+}
+
+std::uint32_t hle_alloc_size() { return s_alloc_size; }
+std::uint32_t hle_last_addr()  { return s_last_addr; }
+std::uint32_t hle_get_addr(std::uint32_t uid) {
+    auto it = s_mem_blocks.find(uid);
+    return (it != s_mem_blocks.end()) ? it->second.addr : 0u;
 }
 
 } // namespace d012

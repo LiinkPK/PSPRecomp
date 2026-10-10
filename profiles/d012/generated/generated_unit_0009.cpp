@@ -3,6 +3,7 @@
 #include <bit>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <limits>
 
 namespace psprecomp {
@@ -24480,12 +24481,14 @@ L_08933388:
     ctx.pc = jump_target;
     return;
 L_08933398:
+    printf("[DBG] L_08933398 entered, sp=0x%08X ra=0x%08X\n", ctx.gpr[29], ctx.gpr[31]);
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-16));
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(0), ctx.gpr[16]);
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(4), ctx.gpr[31]);
     ctx.gpr[31] = (0x089333ACu);
     // nop
     if (rt.invoke_chained_direct<&recomp_unit_0012_entry, 12u, 2113u, 0x08993244u>(ctx, &aot_mem) && ctx.pc == 0x089333ACu) goto L_089333AC;
+    printf("[DBG] L_08933398 entered, sp=0x%08X ra=0x%08X\n", ctx.gpr[29], ctx.gpr[31]); fflush(stdout);
     return;
 L_089333AC:
     ctx.gpr[4] = (2205u << 16u);
@@ -26303,6 +26306,7 @@ L_0893439C:
     aot_mem.aot_store32(ctx.gpr[16] + static_cast<std::uint32_t>(688), ctx.gpr[2]);
     goto L_089343B4;
 L_089343B4:
+    ctx.gpr[16] = (2479u << 16u); // restore s0 in case we arrived via outer dispatch
     ctx.gpr[2] = (aot_mem.aot_load32(ctx.gpr[16] + static_cast<std::uint32_t>(688)));
     goto L_089343B8;
 L_089343B8:

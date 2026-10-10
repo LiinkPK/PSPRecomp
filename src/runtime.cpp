@@ -211,6 +211,12 @@ bool Runtime::invoke_chained_call(AllegrexContext &ctx, GuestMemory::AotFastView
 #endif
     if (chain_depth_ >= chain_depth_limit_) return false;
 
+    if (ctx.pc == 0u) {
+        ctx.gpr[2] = 0u;
+        ctx.pc = ctx.gpr[31] != 0u ? ctx.gpr[31] : 0x00000001u;
+        return true;
+    }
+
     // Indirect jalr/vcall targets usually land in ordinary generated code too.
     // Prefer the tiny dense unit table. Units overlapped by a host/import
     // replacement are poisoned and fall back to exact PC lookup. Ownership is
@@ -645,9 +651,17 @@ void Runtime::run(std::uint32_t entry, std::uint64_t max_dispatches) {
         const RuntimeStarvationHook starvation = g_starvation_hook;
         const std::uint64_t starvation_every = starvation != nullptr ? g_starvation_interval : 0u;
         std::uint64_t executed_dispatches = 0u;
+        std::uint32_t last_dispatch_pc = 0u;
         for (; executed_dispatches < max_dispatches && !stopped_; ++executed_dispatches) {
             const std::uint32_t before = cpu_.pc;
-            if (before == 0u) { stopped_ = true; break; }  // PSP convention: return to 0 = clean thread exit
+            if (before == 0u) {
+                std::printf("[DBG] outer null-PC last=0x%08X ra=0x%08X a0=0x%08X v0=0x%08X sp=0x%08X\n", last_dispatch_pc, cpu_.gpr[31], cpu_.gpr[4], cpu_.gpr[2], cpu_.gpr[29]);
+                if (memory_.contains(cpu_.gpr[21], 4u))
+                    std::printf("[DBG] *s5=0x%08X\n", memory_.load32(cpu_.gpr[21]));
+                cpu_.gpr[2] = 0u;
+                cpu_.pc = cpu_.gpr[31] != 0u ? cpu_.gpr[31] : 0x00000001u;
+                continue;
+            }
             chain_context_invalidated_ = false;
             const std::int32_t dispatch_thread_uid = g_runtime_thread_uid;
             // Most outer dispatches are ordinary AOT PCs.  Resolve those
@@ -662,6 +676,7 @@ void Runtime::run(std::uint32_t entry, std::uint64_t max_dispatches) {
                 stop("No recompiled function registered at " + hex32(before));
                 break;
             }
+            last_dispatch_pc = before;
             g_runtime_dispatch_pc = before;
             count_pc(before);
             if (g_pre_dispatch_hook != nullptr)

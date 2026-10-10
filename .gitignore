@@ -51,3 +51,6 @@ SAVEDATA/
 # Python
 __pycache__/
 *.pyc
+
+# Other Files
+Roadmap.pdf
