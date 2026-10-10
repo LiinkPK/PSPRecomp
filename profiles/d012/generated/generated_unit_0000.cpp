@@ -5995,6 +5995,7 @@ L_08804228:
       goto L_08804230;
     }
 L_08804230:
+    std::printf("[DBG] L_08804230\n");
     aot_mem.aot_store32(ctx.gpr[26] + static_cast<std::uint32_t>(4), ctx.gpr[21]);
     ctx.gpr[21] = (2202u << 16u);
     ctx.gpr[31] = (0x08804240u);
@@ -6065,6 +6066,7 @@ L_08804290:
     ctx.pc = jump_target;
     return;
 L_088042B8:
+    std::printf("[DBG] L_088042B8 s5=0x%08X\n", ctx.gpr[21]);
     ctx.gpr[4] = (ctx.gpr[21] + static_cast<std::uint32_t>(616));
     ctx.gpr[12] = (ctx.gpr[21] + static_cast<std::uint32_t>(708));
     ctx.gpr[11] = (ctx.gpr[21] + static_cast<std::uint32_t>(800));
@@ -6171,6 +6173,7 @@ L_08804348:
     if (rt.invoke_chained_direct<&recomp_unit_0009_entry, 9u, 2695u, 0x08935828u>(ctx, &aot_mem) && ctx.pc == 0x08804414u) goto L_08804414;
     return;
 L_08804414:
+    std::printf("[DBG] L_08804414\n");
     aot_mem.aot_store32(ctx.gpr[21] + static_cast<std::uint32_t>(892), 0u);
     goto L_08804230;
 L_08804498:

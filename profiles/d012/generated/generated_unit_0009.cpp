@@ -26873,6 +26873,7 @@ L_08934880:
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-16));
     ctx.gpr[7] = (2206u << 16u);
     ctx.gpr[6] = (aot_mem.aot_load32(ctx.gpr[7] + static_cast<std::uint32_t>(-30492)));
+    std::printf("[DBG] 0x08934880: global@0x%08X=0x%08X\n", ctx.gpr[7] + static_cast<std::uint32_t>(-30492), ctx.gpr[6]);
     ctx.gpr[5] = (aot_mem.aot_load32(ctx.gpr[6] + static_cast<std::uint32_t>(328)));
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(4), ctx.gpr[31]);
     if (ctx.gpr[5] != 0u) {

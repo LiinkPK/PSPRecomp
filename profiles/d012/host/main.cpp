@@ -33,12 +33,18 @@ int main(int argc, char *argv[]) {
         std::printf("AOT functions registered\n");
         d012::register_hle(runtime);
         std::printf("HLE registered\n");
+        d012::hle_run_ctors(runtime, elf);
+        std::printf("Ctors done\n");
         const std::uint32_t entry     = elf.runtime_entry();
         const std::uint32_t run_entry = entry == 0 ? 0x08804040u : entry;
         std::printf("Entry: 0x%08X  Running from: 0x%08X\n", entry, run_entry);
         runtime.context().gpr[29] = 0x09F00000u;
         runtime.run(run_entry, 1'000'000'000u);
         std::printf("Exited: %s\n", runtime.stop_reason().c_str());
+        while (d012::hle_has_pending_threads()) {
+            d012::hle_run_next_thread(runtime);
+        }
+        std::printf("All threads done\n");
     } catch (const std::exception &e) {
         std::fprintf(stderr, "Exception: %s\n", e.what());
         return 1;

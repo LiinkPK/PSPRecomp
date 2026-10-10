@@ -6,6 +6,8 @@
 #include <cstdio>
 #include <functional>
 #include <unordered_map>
+#include <vector>
+#include <deque>
 
 namespace psprecomp { extern std::uint64_t g_runtime_starvation_interval_fast; }
 
@@ -18,6 +20,19 @@ static std::unordered_map<
     std::uint32_t,
     std::function<void(psprecomp::Runtime &, psprecomp::AllegrexContext &)>>
     s_handlers;
+
+// Thread queue for multi-thread simulation
+struct ThreadDesc {
+    std::uint32_t entry;
+    std::uint32_t uid;
+    std::uint32_t arglen;
+    std::uint32_t argp;
+    std::uint32_t priority;
+};
+static std::deque<ThreadDesc> s_thread_queue;
+static std::uint32_t s_next_thread_uid = 1u;
+// Map uid -> entry for StartThread
+static std::unordered_map<std::uint32_t, ThreadDesc> s_threads;
 
 // Thread entry address saved when sceKernelCreateThread is intercepted
 static std::uint32_t s_thread_entry = 0u;
@@ -214,30 +229,31 @@ void register_hle(psprecomp::Runtime &rt) {
 
 
     rt.register_function(0x089C5FD0u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
-        s_thread_entry = ctx.gpr[5];
-        ctx.gpr[2] = 1u;
+        const std::uint32_t uid = s_next_thread_uid++;
+        ThreadDesc td{ctx.gpr[5], uid, 0u, 0u, ctx.gpr[6]};
+        s_threads[uid] = td;
+        s_thread_entry = ctx.gpr[5]; // keep compat
+        ctx.gpr[2] = uid;
         ctx.pc     = ctx.gpr[31];
-        std::printf("[HLE] sceKernelCreateThread entry=0x%08X\n", s_thread_entry);
+        std::printf("[HLE] sceKernelCreateThread uid=%u entry=0x%08X priority=%u\n", uid, td.entry, td.priority);
     }, "hle_createthread");
 
-    rt.register_function(0x089C5FA0u, [](psprecomp::Runtime &rt, psprecomp::AllegrexContext &ctx) {
-        if (s_thread_entry != 0u) {
-            std::printf("[HLE] sceKernelStartThread entry=0x%08X\n", s_thread_entry);
-            ctx.gpr[4]  = ctx.gpr[5];
-            ctx.gpr[5]  = ctx.gpr[6];
-            ctx.gpr[29] = 0x09EF0000u;
-            ctx.gpr[26] = 0x09EE0000u;
-            ctx.gpr[28] = 0x08B6B260u;
-            ctx.gpr[31] = 0x00000001u;
-            ctx.gpr[2]  = 0u;
-            // Pre-seed sentinel at the bottom of the thread stack so any
-            // function that loads ra from sp+offset gets a valid exit address.
-            rt.memory().store32(0x09EF7BFCu, 0x00000001u);
-            ctx.pc      = s_thread_entry;
+    rt.register_function(0x089C5FA0u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+        const std::uint32_t uid    = ctx.gpr[4];
+        const std::uint32_t arglen = ctx.gpr[5];
+        const std::uint32_t argp   = ctx.gpr[6];
+        auto it = s_threads.find(uid);
+        if (it != s_threads.end()) {
+            ThreadDesc td = it->second;
+            td.arglen = arglen;
+            td.argp   = argp;
+            s_thread_queue.push_back(td);
+            std::printf("[HLE] sceKernelStartThread uid=%u entry=0x%08X queued\n", uid, td.entry);
         } else {
-            ctx.gpr[2] = 0u;
-            ctx.pc     = ctx.gpr[31];
+            std::printf("[HLE] sceKernelStartThread uid=%u NOT FOUND\n", uid);
         }
+        ctx.gpr[2] = 0u;
+        ctx.pc     = ctx.gpr[31];
     }, "hle_startthread");
 }
 
@@ -262,6 +278,46 @@ std::uint32_t hle_last_addr()  { return s_last_addr; }
 std::uint32_t hle_get_addr(std::uint32_t uid) {
     auto it = s_mem_blocks.find(uid);
     return (it != s_mem_blocks.end()) ? it->second.addr : 0u;
+}
+
+bool hle_has_pending_threads() { return !s_thread_queue.empty(); }
+
+void hle_run_ctors(psprecomp::Runtime &rt, const psprecomp::Elf32Image &elf) {
+    const auto &sections = elf.sections();
+    for (const auto &sec : sections) {
+        if (sec.name != ".ctors" && sec.name != ".init_array") continue;
+        const std::uint32_t base = elf.section_runtime_address(sec);
+        const std::uint32_t count = sec.size / 4u;
+        std::printf("[HLE] Running %u ctors from %s at 0x%08X\n", count, sec.name.c_str(), base);
+        for (std::uint32_t i = 0u; i < count; ++i) {
+            const std::uint32_t fn = rt.memory().load32(base + i * 4u);
+            if (fn == 0u || fn == 0xFFFFFFFFu) continue;
+            std::printf("[HLE] ctor[%u] = 0x%08X\n", i, fn);
+            auto &ctx = rt.context();
+            ctx.gpr[29] = 0x09F00000u;
+            ctx.gpr[31] = 0x00000001u;
+            rt.run(fn, 100'000'000u);
+        }
+    }
+}
+
+void hle_run_next_thread(psprecomp::Runtime &rt) {
+    if (s_thread_queue.empty()) return;
+    ThreadDesc td = s_thread_queue.front();
+    s_thread_queue.pop_front();
+    std::printf("[HLE] Running queued thread entry=0x%08X uid=%u\n", td.entry, td.uid);
+
+    auto &ctx = rt.context();
+    ctx.gpr[4]  = td.arglen;
+    ctx.gpr[5]  = td.argp;
+    ctx.gpr[29] = 0x09EF0000u;
+    ctx.gpr[26] = 0x09EE0000u;
+    ctx.gpr[28] = 0x08B6B260u;
+    ctx.gpr[31] = 0x00000001u;
+    for (std::uint32_t a = 0x09EC0000u; a < 0x09EFF000u; a += 4u)
+        rt.memory().store32(a, 0x00000001u);
+    rt.run(td.entry, 2'000'000'000u);
+    std::printf("[HLE] Thread uid=%u exited: %s\n", td.uid, rt.stop_reason().c_str());
 }
 
 } // namespace d012
