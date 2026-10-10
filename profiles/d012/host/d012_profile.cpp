@@ -314,6 +314,7 @@ void hle_run_next_thread(psprecomp::Runtime &rt) {
     ctx.gpr[26] = 0x09EE0000u;
     ctx.gpr[28] = 0x08B6B260u;
     ctx.gpr[31] = 0x00000001u;
+    std::printf("[HLE] Thread ctx before run: sp=0x%08X ra=0x%08X\n", ctx.gpr[29], ctx.gpr[31]);
     for (std::uint32_t a = 0x09EC0000u; a < 0x09EFF000u; a += 4u)
         rt.memory().store32(a, 0x00000001u);
     rt.run(td.entry, 2'000'000'000u);
