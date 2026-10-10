@@ -1,4 +1,4 @@
-#include "psprecomp/runtime.hpp"
+﻿#include "psprecomp/runtime.hpp"
 #include "generated_units.hpp"
 #include <bit>
 #include <cmath>
@@ -5671,9 +5671,16 @@ LOCAL_DISPATCH:
     case 0x08884024u: goto L_08884024;
     case 0x0888402Cu: goto L_0888402C;
     case 0x08884034u: goto L_08884034;
+        case 0x08864E70u: { extern void init_08864e70_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_08864e70_entry(rt, ctx, 1u, aot_mem); return; }
+        case 0x08869844u: { extern void init_08869844_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_08869844_entry(rt, ctx, 1u, aot_mem); return; }
+        case 0x0886EE14u: { extern void init_0886ee14_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_0886ee14_entry(rt, ctx, 1u, aot_mem); return; }
+        case 0x088735CCu: { extern void init_088735cc_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_088735cc_entry(rt, ctx, 1u, aot_mem); return; }
+        case 0x08874508u: { extern void init_08874508_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_08874508_entry(rt, ctx, 1u, aot_mem); return; }
+        case 0x08874E18u: { extern void init_08874e18_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_08874e18_entry(rt, ctx, 1u, aot_mem); return; }
+        case 0x08883E50u: { extern void init_08883e50_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_08883e50_entry(rt, ctx, 1u, aot_mem); return; }
+
     default:
-        if (local_transfers == 0u) rt.unsupported(ctx.pc, 0u, "invalid internal function entry");
-        else ctx.pc = local_pc;
+        ctx.pc = local_pc;
         return;
     }
 L_08864B5C:

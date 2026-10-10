@@ -1,4 +1,4 @@
-#include "psprecomp/runtime.hpp"
+﻿#include "psprecomp/runtime.hpp"
 #include "generated_units.hpp"
 #include <bit>
 #include <cmath>
@@ -5358,9 +5358,17 @@ LOCAL_DISPATCH:
     case 0x088A4020u: goto L_088A4020;
     case 0x088A4024u: goto L_088A4024;
     case 0x088A402Cu: goto L_088A402C;
+        case 0x088841CCu: { extern void init_088841cc_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_088841cc_entry(rt, ctx, 1u, aot_mem); return; }
+        case 0x0888E65Cu: { extern void init_0888e65c_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_0888e65c_entry(rt, ctx, 1u, aot_mem); return; }
+        case 0x08890780u: { extern void init_08890780_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_08890780_entry(rt, ctx, 1u, aot_mem); return; }
+        case 0x08895A28u: { extern void init_08895a28_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_08895a28_entry(rt, ctx, 1u, aot_mem); return; }
+        case 0x0889723Cu: { extern void init_0889723c_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_0889723c_entry(rt, ctx, 1u, aot_mem); return; }
+        case 0x088A0768u: { extern void init_088a0768_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_088a0768_entry(rt, ctx, 1u, aot_mem); return; }
+        case 0x088A0D60u: { extern void init_088a0d60_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_088a0d60_entry(rt, ctx, 1u, aot_mem); return; }
+        case 0x088A38ECu: { extern void init_088a38ec_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_088a38ec_entry(rt, ctx, 1u, aot_mem); return; }
+
     default:
-        if (local_transfers == 0u) rt.unsupported(ctx.pc, 0u, "invalid internal function entry");
-        else ctx.pc = local_pc;
+        ctx.pc = local_pc;
         return;
     }
 L_08884040:

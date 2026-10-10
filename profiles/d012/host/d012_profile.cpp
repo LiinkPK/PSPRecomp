@@ -31,6 +31,10 @@ struct ThreadDesc {
 };
 static std::deque<ThreadDesc> s_thread_queue;
 static std::uint32_t s_next_thread_uid = 1u;
+static std::uint32_t s_next_cb_uid   = 0x100u;
+static std::uint32_t s_next_sema_uid = 0x200u;
+static std::unordered_map<std::uint32_t, std::uint32_t>  s_callbacks;
+static std::unordered_map<std::uint32_t, std::int32_t>   s_semas;
 // Map uid -> entry for StartThread
 static std::unordered_map<std::uint32_t, ThreadDesc> s_threads;
 
@@ -59,39 +63,11 @@ void generic_stub(psprecomp::Runtime &rt, psprecomp::AllegrexContext &ctx) {
         return;
     }
 
-    const std::uint32_t a0 = ctx.gpr[4];
-    const std::uint32_t a1 = ctx.gpr[5];
-    const std::uint32_t a2 = ctx.gpr[6];
-    const std::uint32_t ra = ctx.gpr[31];
-
-    // Heuristic: first unknown stub whose a1 is a PSP user-space code address
-    // → sceKernelCreateThread(name, entry, priority, stackSize, attr, opt)
-    if (s_thread_entry == 0u && a1 >= 0x08800000u && a1 < 0x09000000u) {
-        s_thread_entry = a1;
-        ctx.gpr[2] = 1u;   // return UID = 1
-        ctx.pc     = ra;
-        std::printf("[HLE] sceKernelCreateThread at 0x%08X  entry=0x%08X\n", va, s_thread_entry);
-        return;
-    }
-
-    // Heuristic: a0 == our UID (1) and we already know the thread entry
-    // → sceKernelStartThread(thid, arglen, argp)
-    if (a0 == 1u && s_thread_entry != 0u) {
-        std::printf("[HLE] sceKernelStartThread at 0x%08X  jumping to 0x%08X\n", va, s_thread_entry);
-        ctx.gpr[4]  = a1;            // thread a0 = arglen
-        ctx.gpr[5]  = a2;            // thread a1 = argp
-        ctx.gpr[29] = 0x09EF0000u;  // fresh thread stack
-        rt.memory().store32(0x09EF7BFCu, 0x00000001u);
-        ctx.gpr[2]  = 0u;
-        ctx.pc      = s_thread_entry;
-        return;
-    }
-
     // Truly unknown — log everything so we can identify it next run
     std::printf("[HLE] UNKNOWN stub at 0x%08X  RA=0x%08X  a0=0x%08X a1=0x%08X a2=0x%08X a3=0x%08X\n",
-                va, ra, a0, a1, a2, ctx.gpr[7]);
+                va, ctx.gpr[31], ctx.gpr[4], ctx.gpr[5], ctx.gpr[6], ctx.gpr[7]);
     ctx.gpr[2] = 0u;
-    ctx.pc     = ra;
+    ctx.pc     = ctx.gpr[31];
 }
 
 } // anonymous namespace
@@ -227,6 +203,78 @@ void register_hle(psprecomp::Runtime &rt) {
         rt.stop("sceKernelExitThread");
     }, "hle_exitthread");
 
+    // ThreadManForUser stubs
+
+    // sceKernelCreateCallback(name, func, arg) -> uid
+    rt.register_function(0x089C5F80u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+        const std::uint32_t uid = s_next_cb_uid++;
+        s_callbacks[uid] = ctx.gpr[5];
+        std::printf("[HLE] sceKernelCreateCallback func=0x%08X -> uid=%u\n", ctx.gpr[5], uid);
+        ctx.gpr[2] = uid;
+        ctx.pc     = ctx.gpr[31];
+    }, "hle_createcallback");
+
+    // sceKernelDeleteCallback(uid) -> 0
+    rt.register_function(0x089C5F90u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+        s_callbacks.erase(ctx.gpr[4]);
+        ctx.gpr[2] = 0u;
+        ctx.pc     = ctx.gpr[31];
+    }, "hle_deletecallback");
+
+    // sceKernelChangeCurrentThreadAttr -> 0
+    rt.register_function(0x089C5F88u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+        ctx.gpr[2] = 0u;
+        ctx.pc     = ctx.gpr[31];
+    }, "hle_changethreadattr");
+
+    // sceKernelDelayThread(us) -> 0
+    rt.register_function(0x089C5F68u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+        ctx.gpr[2] = 0u;
+        ctx.pc     = ctx.gpr[31];
+    }, "hle_delaythread");
+
+    // sceKernelDelayThreadCB(us) -> 0
+    rt.register_function(0x089C5FF0u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+        ctx.gpr[2] = 0u;
+        ctx.pc     = ctx.gpr[31];
+    }, "hle_delaythreadcb");
+
+    // sceKernelCreateSema(name, attr, initVal, maxVal, opt) -> uid
+    rt.register_function(0x089C5F70u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+        const std::uint32_t uid = s_next_sema_uid++;
+        s_semas[uid] = static_cast<std::int32_t>(ctx.gpr[6]);
+        std::printf("[HLE] sceKernelCreateSema initVal=%d -> uid=%u\n", ctx.gpr[6], uid);
+        ctx.gpr[2] = uid;
+        ctx.pc     = ctx.gpr[31];
+    }, "hle_createsema");
+
+    // sceKernelDeleteSema(uid) -> 0
+    rt.register_function(0x089C5F78u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+        s_semas.erase(ctx.gpr[4]);
+        ctx.gpr[2] = 0u;
+        ctx.pc     = ctx.gpr[31];
+    }, "hle_deletesema");
+
+    // sceKernelSignalSema(uid, signal) -> 0
+    rt.register_function(0x089C5FC0u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+        auto it = s_semas.find(ctx.gpr[4]);
+        if (it != s_semas.end()) it->second += static_cast<std::int32_t>(ctx.gpr[5]);
+        ctx.gpr[2] = 0u;
+        ctx.pc     = ctx.gpr[31];
+    }, "hle_signalsema");
+
+    // sceKernelWaitSema(uid, signal, timeout) -> 0
+    rt.register_function(0x089C5FC8u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+        ctx.gpr[2] = 0u;
+        ctx.pc     = ctx.gpr[31];
+    }, "hle_waitsema");
+
+    // sceKernelWaitThreadEnd(uid, timeout) -> 0
+    rt.register_function(0x089C5FB0u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+        ctx.gpr[2] = 0u;
+        ctx.pc     = ctx.gpr[31];
+    }, "hle_waitthreadend");
+
 
     rt.register_function(0x089C5FD0u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
         const std::uint32_t uid = s_next_thread_uid++;
@@ -255,6 +303,126 @@ void register_hle(psprecomp::Runtime &rt) {
         ctx.gpr[2] = 0u;
         ctx.pc     = ctx.gpr[31];
     }, "hle_startthread");
+
+    // sceKernelCreateEventFlag(name, attr, bits, opt) -> uid
+    rt.register_function(0x089C5FE0u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+        static std::uint32_t s_next_evf = 0x300u;
+        const std::uint32_t uid = s_next_evf++;
+        ctx.gpr[2] = uid;
+        ctx.pc     = ctx.gpr[31];
+        std::printf("[HLE] sceKernelCreateEventFlag -> uid=%u\n", uid);
+    }, "hle_createeventflag");
+
+    // sceKernelDeleteEventFlag(uid) -> 0
+    rt.register_function(0x089C5F98u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+        ctx.gpr[2] = 0u;
+        ctx.pc     = ctx.gpr[31];
+    }, "hle_deleteeventflag");
+
+    // sceKernelRegisterExitCallback(uid) -> 0
+    rt.register_function(0x089C5EF8u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+        ctx.gpr[2] = 0u;
+        ctx.pc     = ctx.gpr[31];
+    }, "hle_registerexitcb");
+
+    // sceKernelExitGame() -> noreturn; just stop
+    rt.register_function(0x089C5EF0u, [](psprecomp::Runtime &rt, psprecomp::AllegrexContext &) {
+        rt.stop("sceKernelExitGame");
+    }, "hle_exitgame");
+
+    // sceGeEdramGetAddr() -> 0x04000000 (VRAM base on PSP)
+    rt.register_function(0x089C5A98u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+        ctx.gpr[2] = 0x04000000u;
+        ctx.pc     = ctx.gpr[31];
+    }, "hle_geedramgetaddr");
+
+    // sceGeEdramGetSize() -> 0x200000
+    rt.register_function(0x089C5A60u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+        ctx.gpr[2] = 0x00200000u;
+        ctx.pc     = ctx.gpr[31];
+    }, "hle_geedramgetsize");
+
+    // sceGeSetCallback(cb) -> id (non-negative)
+    rt.register_function(0x089C5A70u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+        ctx.gpr[2] = 1u;
+        ctx.pc     = ctx.gpr[31];
+    }, "hle_gesetcallback");
+
+    // sceGeUnsetCallback(id) -> 0
+    rt.register_function(0x089C5A50u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+        ctx.gpr[2] = 0u;
+        ctx.pc     = ctx.gpr[31];
+    }, "hle_geunsetcallback");
+
+    // sceGeListEnQueue(list, stall, cbid, arg) -> list_id
+    rt.register_function(0x089C5A78u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+        static std::uint32_t s_list_id = 1u;
+        ctx.gpr[2] = s_list_id++;
+        ctx.pc     = ctx.gpr[31];
+    }, "hle_gelistenqueue");
+
+    // sceGeListEnQueueHead(list, stall, cbid, arg) -> list_id
+    rt.register_function(0x089C5A58u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+        static std::uint32_t s_list_id_h = 0x80u;
+        ctx.gpr[2] = s_list_id_h++;
+        ctx.pc     = ctx.gpr[31];
+    }, "hle_gelistenqueuehead");
+
+    // sceGeListSync(listid, syncType) -> 0
+    rt.register_function(0x089C5A48u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+        ctx.gpr[2] = 0u;
+        ctx.pc     = ctx.gpr[31];
+    }, "hle_gelistsync");
+
+    // sceGeDrawSync(syncType) -> 0
+    rt.register_function(0x089C5A80u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+        ctx.gpr[2] = 0u;
+        ctx.pc     = ctx.gpr[31];
+    }, "hle_gedrawsync");
+
+    // sceGeBreak(mode, pbresult) -> 0
+    rt.register_function(0x089C5A88u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+        ctx.gpr[2] = 0u;
+        ctx.pc     = ctx.gpr[31];
+    }, "hle_gebreak");
+
+    // sceGeContinue() -> 0
+    rt.register_function(0x089C5A68u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+        ctx.gpr[2] = 0u;
+        ctx.pc     = ctx.gpr[31];
+    }, "hle_gecontinue");
+
+    // sceGeListUpdateStallAddr(listid, stall) -> 0
+    rt.register_function(0x089C5A90u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+        ctx.gpr[2] = 0u;
+        ctx.pc     = ctx.gpr[31];
+    }, "hle_gelistupdatestall");
+
+    // sceKernelCpuSuspendIntr() -> saved state (just return 0)
+    rt.register_function(0x089C5EC8u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+        ctx.gpr[2] = 0u;
+        ctx.pc     = ctx.gpr[31];
+    }, "hle_cpususpendintr");
+
+    // sceKernelCpuResumeIntr(state) -> void
+    rt.register_function(0x089C5EE8u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+        ctx.gpr[2] = 0u;
+        ctx.pc     = ctx.gpr[31];
+    }, "hle_cpuresumeintr");
+
+    // DEBUG: trap calls to BSS graphics object (0x08C10DA0) to find who calls it
+    // ra=0x08C10DA0 means jalr inside the scheduler at ra of scheduler
+    rt.register_function(0x08C10DA0u, [](psprecomp::Runtime &rt2, psprecomp::AllegrexContext &ctx) {
+        static int count = 0;
+        if (count++ < 3) {
+            std::printf("[DBG] CALLED 0x08C10DA0 ra=0x%08X a0=0x%08X task[0]=0x%08X\n",
+                        ctx.gpr[31], ctx.gpr[4],
+                        (ctx.gpr[4] >= 0x08800000u && ctx.gpr[4] < 0x0A000000u)
+                            ? rt2.memory().load32(ctx.gpr[4]) : 0u);
+        }
+        ctx.gpr[2] = 0u;
+        ctx.pc     = ctx.gpr[31];
+    }, "hle_bss_debug_08c10da0");
 }
 
 static std::uint32_t s_last_addr = 0u;

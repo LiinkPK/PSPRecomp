@@ -2287,9 +2287,9 @@ LOCAL_DISPATCH:
     case 0x0896176Cu: goto L_0896176C;
     case 0x08961784u: goto L_08961784;
     case 0x08963400u: goto L_08963400;
+    case 0x0894DD74u: { extern void init_0894DD74_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_0894DD74_entry(rt, ctx, 1u, aot_mem); return; }
     default:
-        if (local_transfers == 0u) rt.unsupported(ctx.pc, 0u, "invalid internal function entry");
-        else ctx.pc = local_pc;
+        ctx.pc = local_pc;
         return;
     }
 L_08944040:

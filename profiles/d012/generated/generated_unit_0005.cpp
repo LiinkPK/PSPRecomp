@@ -1,4 +1,4 @@
-#include "psprecomp/runtime.hpp"
+﻿#include "psprecomp/runtime.hpp"
 #include "generated_units.hpp"
 #include <bit>
 #include <cmath>
@@ -5585,9 +5585,23 @@ LOCAL_DISPATCH:
     case 0x088C29B4u: goto L_088C29B4;
     case 0x088C29C0u: goto L_088C29C0;
     case 0x088C29ECu: goto L_088C29EC;
+        case 0x088A4168u: { extern void init_088a4168_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_088a4168_entry(rt, ctx, 1u, aot_mem); return; }
+        case 0x088A52CCu: { extern void init_088a52cc_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_088a52cc_entry(rt, ctx, 1u, aot_mem); return; }
+        case 0x088A94A0u: { extern void init_088a94a0_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_088a94a0_entry(rt, ctx, 1u, aot_mem); return; }
+        case 0x088AEF44u: { extern void init_088aef44_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_088aef44_entry(rt, ctx, 1u, aot_mem); return; }
+        case 0x088B1DF4u: { extern void init_088b1df4_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_088b1df4_entry(rt, ctx, 1u, aot_mem); return; }
+        case 0x088B2AD0u: { extern void init_088b2ad0_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_088b2ad0_entry(rt, ctx, 1u, aot_mem); return; }
+        case 0x088B7154u: { extern void init_088b7154_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_088b7154_entry(rt, ctx, 1u, aot_mem); return; }
+        case 0x088BBA64u: { extern void init_088bba64_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_088bba64_entry(rt, ctx, 1u, aot_mem); return; }
+        case 0x088BBE18u: { extern void init_088bbe18_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_088bbe18_entry(rt, ctx, 1u, aot_mem); return; }
+        case 0x088BD104u: { extern void init_088bd104_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_088bd104_entry(rt, ctx, 1u, aot_mem); return; }
+        case 0x088BD2C4u: { extern void init_088bd2c4_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_088bd2c4_entry(rt, ctx, 1u, aot_mem); return; }
+        case 0x088C0AACu: { extern void init_088c0aac_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_088c0aac_entry(rt, ctx, 1u, aot_mem); return; }
+        case 0x088C14B0u: { extern void init_088c14b0_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_088c14b0_entry(rt, ctx, 1u, aot_mem); return; }
+        case 0x088C1C04u: { extern void init_088c1c04_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_088c1c04_entry(rt, ctx, 1u, aot_mem); return; }
+
     default:
-        if (local_transfers == 0u) rt.unsupported(ctx.pc, 0u, "invalid internal function entry");
-        else ctx.pc = local_pc;
+        ctx.pc = local_pc;
         return;
     }
 L_088A4040:

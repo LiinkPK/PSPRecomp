@@ -1122,6 +1122,8 @@ LOCAL_DISPATCH:
     case 0x0880A954u: goto L_0880A954;
     case 0x0880A96Cu: goto L_0880A96C;
     case 0x0880A970u: goto L_0880A970;
+    case 0x0880A9A0u: goto L_0880A9A0;
+    case 0x0880A9DCu: goto L_0880A9DC;
     case 0x0880A9E8u: goto L_0880A9E8;
     case 0x0880AA20u: goto L_0880AA20;
     case 0x0880AA2Cu: goto L_0880AA2C;
@@ -5734,9 +5736,12 @@ LOCAL_DISPATCH:
     case 0x08823FACu: goto L_08823FAC;
     case 0x08823FD0u: goto L_08823FD0;
     case 0x08824014u: goto L_08824014;
+    case 0x0880B028u: { extern void init_0880B028_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_0880B028_entry(rt, ctx, 1u, aot_mem); return; }
+    case 0x0880BEB8u: { extern void init_0880BEB8_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_0880BEB8_entry(rt, ctx, 1u, aot_mem); return; }
+    case 0x08811EF4u: { extern void init_08811EF4_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_08811EF4_entry(rt, ctx, 1u, aot_mem); return; }
+    case 0x08813574u: { extern void init_08813574_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_08813574_entry(rt, ctx, 1u, aot_mem); return; }
     default:
-        if (local_transfers == 0u) rt.unsupported(ctx.pc, 0u, "invalid internal function entry");
-        else ctx.pc = local_pc;
+        ctx.pc = local_pc;
         return;
     }
 L_08804040:
@@ -17034,6 +17039,32 @@ L_0880A970:
     ctx.gpr[31] = (aot_mem.aot_load32(ctx.gpr[29] + static_cast<std::uint32_t>(568)));
     jump_target = ctx.gpr[31];
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(576));
+    ctx.pc = jump_target;
+    local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+    return;
+L_0880A9A0:
+    ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-16));
+    ctx.gpr[4]  = (0x089Du << 16u);
+    ctx.gpr[5]  = (ctx.gpr[4] + static_cast<std::uint32_t>(0x2800));
+    aot_mem.aot_store32(ctx.gpr[5] + static_cast<std::uint32_t>(4), 0u);
+    ctx.gpr[5]  = (0x089Du << 16u);
+    aot_mem.aot_store32(ctx.gpr[4] + static_cast<std::uint32_t>(0x2800), 0u);
+    ctx.gpr[4]  = (ctx.gpr[5] + static_cast<std::uint32_t>(0x2808));
+    aot_mem.aot_store32(ctx.gpr[5] + static_cast<std::uint32_t>(0x2808), 0u);
+    ctx.gpr[7]  = (0x0881u << 16u);
+    ctx.gpr[4]  = (ctx.gpr[4] + static_cast<std::uint32_t>(4));
+    ctx.gpr[5]  = (0u + static_cast<std::uint32_t>(0xFA));
+    ctx.gpr[6]  = (0u + static_cast<std::uint32_t>(0x20));
+    aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(0), ctx.gpr[31]);
+    ctx.gpr[7]  = (ctx.gpr[7] + static_cast<std::uint32_t>(0x9194));
+    ctx.gpr[31] = (0x0880A9DCu);
+    if (rt.invoke_chained_direct<&recomp_unit_0012_entry, 12u, 2174u, 0x08993560u>(ctx, &aot_mem) && ctx.pc == 0x0880A9DCu) goto L_0880A9DC;
+    return;
+L_0880A9DC:
+    ctx.gpr[31] = (aot_mem.aot_load32(ctx.gpr[29] + static_cast<std::uint32_t>(0)));
+    jump_target = ctx.gpr[31];
+    ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(16));
     ctx.pc = jump_target;
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }

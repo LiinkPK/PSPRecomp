@@ -2277,8 +2277,7 @@ LOCAL_DISPATCH:
     case 0x089DD380u: goto L_089DD380;
     case 0x089DD38Cu: goto L_089DD38C;
     default:
-        if (local_transfers == 0u) rt.unsupported(ctx.pc, 0u, "invalid internal function entry");
-        else ctx.pc = local_pc;
+        ctx.pc = local_pc;
         return;
     }
 L_089C4044:

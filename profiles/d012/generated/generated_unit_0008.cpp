@@ -1,4 +1,4 @@
-#include "psprecomp/runtime.hpp"
+﻿#include "psprecomp/runtime.hpp"
 #include "generated_units.hpp"
 #include <bit>
 #include <cmath>
@@ -4677,9 +4677,11 @@ LOCAL_DISPATCH:
     case 0x08923EC0u: goto L_08923EC0;
     case 0x08923EC8u: goto L_08923EC8;
     case 0x08923ECCu: goto L_08923ECC;
+        case 0x0890EA50u: { extern void init_0890ea50_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_0890ea50_entry(rt, ctx, 1u, aot_mem); return; }
+        case 0x0891DEF8u: { extern void init_0891def8_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_0891def8_entry(rt, ctx, 1u, aot_mem); return; }
+
     default:
-        if (local_transfers == 0u) rt.unsupported(ctx.pc, 0u, "invalid internal function entry");
-        else ctx.pc = local_pc;
+        ctx.pc = local_pc;
         return;
     }
 L_08904040:
