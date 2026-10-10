@@ -1,4 +1,4 @@
-#include "d012_profile.hpp"
+﻿#include "d012_profile.hpp"
 #include "psprecomp/runtime.hpp"
 #include "psprecomp/elf32.hpp"
 
@@ -42,7 +42,7 @@ static std::unordered_map<std::uint32_t, ThreadDesc> s_threads;
 static std::uint32_t s_thread_entry = 0u;
 static std::uint32_t s_alloc_size = 0u;
 
-// SysMem partition allocator — bump allocator in upper RAM
+// SysMem partition allocator â€” bump allocator in upper RAM
 static constexpr std::uint32_t kHeapBase = 0x09C00000u;
 static constexpr std::uint32_t kHeapEnd  = 0x09EE0000u;
 static std::uint32_t s_heap_next = kHeapBase;
@@ -63,7 +63,7 @@ void generic_stub(psprecomp::Runtime &rt, psprecomp::AllegrexContext &ctx) {
         return;
     }
 
-    // Truly unknown — log everything so we can identify it next run
+    // Truly unknown â€” log everything so we can identify it next run
     std::printf("[HLE] UNKNOWN stub at 0x%08X  RA=0x%08X  a0=0x%08X a1=0x%08X a2=0x%08X a3=0x%08X\n",
                 va, ctx.gpr[31], ctx.gpr[4], ctx.gpr[5], ctx.gpr[6], ctx.gpr[7]);
     ctx.gpr[2] = 0u;
@@ -402,13 +402,13 @@ void register_hle(psprecomp::Runtime &rt) {
     rt.register_function(0x089C5EC8u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
         ctx.gpr[2] = 0u;
         ctx.pc     = ctx.gpr[31];
-    }, "hle_cpususpendintr");
+    }, "recomp_unit_cpususpendintr");
 
     // sceKernelCpuResumeIntr(state) -> void
     rt.register_function(0x089C5EE8u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
         ctx.gpr[2] = 0u;
         ctx.pc     = ctx.gpr[31];
-    }, "hle_cpuresumeintr");
+    }, "recomp_unit_cpuresumeintr");
 
     // DEBUG: trap calls to BSS graphics object (0x08C10DA0) to find who calls it
     // ra=0x08C10DA0 means jalr inside the scheduler at ra of scheduler

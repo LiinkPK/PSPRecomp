@@ -5001,8 +5001,9 @@ LOCAL_DISPATCH:
     case 0x08863EE4u: goto L_08863EE4;
     case 0x08863F0Cu: goto L_08863F0C;
         case 0x08847224u: { extern void init_08847224_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_08847224_entry(rt, ctx, 1u, aot_mem); return; }
-        case 0x0884E620u: { extern void init_0884e620_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_0884e620_entry(rt, ctx, 1u, aot_mem); return; }
-        case 0x08850B20u: { extern void init_08850b20_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_08850b20_entry(rt, ctx, 1u, aot_mem); return; }
+        case 0x0884E620u: { extern void init_0884E620_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_0884E620_entry(rt, ctx, 1u, aot_mem); return; }
+        case 0x08850B20u: { extern void init_08850B20_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_08850B20_entry(rt, ctx, 1u, aot_mem); return; }
+
 
     default:
         ctx.pc = local_pc;

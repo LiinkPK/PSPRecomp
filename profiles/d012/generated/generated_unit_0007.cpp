@@ -5809,8 +5809,9 @@ LOCAL_DISPATCH:
     case 0x08904028u: goto L_08904028;
     case 0x0890402Cu: goto L_0890402C;
     case 0x08904038u: goto L_08904038;
-        case 0x088F7800u: { extern void init_088f7800_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_088f7800_entry(rt, ctx, 1u, aot_mem); return; }
-        case 0x088FB9F4u: { extern void init_088fb9f4_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_088fb9f4_entry(rt, ctx, 1u, aot_mem); return; }
+        case 0x088F7800u: { extern void init_088F7800_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_088F7800_entry(rt, ctx, 1u, aot_mem); return; }
+        case 0x088FB9F4u: { extern void init_088FB9F4_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_088FB9F4_entry(rt, ctx, 1u, aot_mem); return; }
+
 
     default:
         ctx.pc = local_pc;
