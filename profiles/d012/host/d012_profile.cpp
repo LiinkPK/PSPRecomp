@@ -410,8 +410,9 @@ void register_hle(psprecomp::Runtime &rt) {
         ctx.pc     = ctx.gpr[31];
     }, "recomp_unit_cpuresumeintr");
 
-    // DEBUG: trap calls to BSS graphics object (0x08C10DA0) to find who calls it
-    // ra=0x08C10DA0 means jalr inside the scheduler at ra of scheduler
+
+    // 0x08C10DA0 is a GE object in BSS; the task scheduler writes a function
+    // pointer into it. Trap it so we can see what's calling and what it expects.
     rt.register_function(0x08C10DA0u, [](psprecomp::Runtime &rt2, psprecomp::AllegrexContext &ctx) {
         static int count = 0;
         if (count++ < 3) {
