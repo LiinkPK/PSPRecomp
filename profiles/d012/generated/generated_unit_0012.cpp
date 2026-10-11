@@ -4486,7 +4486,10 @@ LOCAL_DISPATCH:
     case 0x0899F80Cu: goto L_0899F80C;
     case 0x0899F83Cu: goto L_0899F83C;
     case 0x0899F850u: goto L_0899F850;
+    case 0x0899F86Cu: goto L_0899F86C;
     case 0x0899F90Cu: goto L_0899F90C;
+    case 0x0899F92Cu: goto L_0899F92C;
+    case 0x0899F980u: goto L_0899F980;
     case 0x0899F9B0u: goto L_0899F9B0;
     case 0x0899FA00u: goto L_0899FA00;
     case 0x0899FA28u: goto L_0899FA28;
@@ -4569,8 +4572,11 @@ LOCAL_DISPATCH:
     case 0x089A0180u: goto L_089A0180;
     case 0x089A0190u: goto L_089A0190;
     case 0x089A01A0u: goto L_089A01A0;
+    case 0x089A01BCu: goto L_089A01BC; // table2[0]: case 0 sceGeDrawSync
     case 0x089A01C4u: goto L_089A01C4;
     case 0x089A01D0u: goto L_089A01D0;
+    case 0x089A01D8u: goto L_089A01D8; // table2[3]: case 3 sceGeListSync
+    case 0x089A01F0u: goto L_089A01F0; // table2[4]: case 4 sceGeListSync
     case 0x089A01FCu: goto L_089A01FC;
     case 0x089A0224u: goto L_089A0224;
     case 0x089A0228u: goto L_089A0228;
@@ -49907,6 +49913,10 @@ L_0899F800:
     ctx.gpr[3] = (ctx.gpr[2] | 1u);
     goto L_0899F7F8;
 L_0899F80C:
+    { static bool dumped = false;
+      if (!dumped) { dumped = true;
+        std::printf("[DBG] GE table1 @0x089D18CC:"); for(int _i=0;_i<5;_i++) std::printf(" [%d]=0x%08X",_i,aot_mem.aot_load32(static_cast<std::uint32_t>(0x089D18CC+_i*4))); std::printf("\n");
+        std::printf("[DBG] GE table2 @0x089D18E0:"); for(int _i=0;_i<5;_i++) std::printf(" [%d]=0x%08X",_i,aot_mem.aot_load32(static_cast<std::uint32_t>(0x089D18E0+_i*4))); std::printf("\n"); } }
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-16));
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(0), ctx.gpr[16]);
     ctx.gpr[16] = (2479u << 16u);
@@ -49943,10 +49953,36 @@ L_0899F850:
     ctx.gpr[6] = (aot_mem.aot_load32(ctx.gpr[8] + static_cast<std::uint32_t>(0)));
     jump_target = ctx.gpr[6];
     // nop
+    { uint32_t base = aot_mem.aot_load32(static_cast<std::uint32_t>(0x09af6830));
+      std::printf("[DBG] 0899F850 table[%u]=0x%08X DAT_09af6830=0x%08X [3]=0x%08X [4]=0x%08X\n",
+          ctx.gpr[3], ctx.gpr[6], base,
+          base ? aot_mem.aot_load32(base+12) : 0u,
+          base ? aot_mem.aot_load32(base+16) : 0u); }
     ctx.pc = jump_target;
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
+L_0899F86C: // GE ring-buf slot handler mode-0 — keep slot valid, return success
+    std::printf("[DBG] 0899F86C slot-alloc called DAT_09af6830=0x%08X\n",
+        aot_mem.aot_load32(static_cast<std::uint32_t>(0x09AF6830)));
+    { // Ensure DAT_09af6830 stays at a valid slot (0x09AF6834); recycle on null
+      uint32_t cur = aot_mem.aot_load32(static_cast<std::uint32_t>(0x09AF6830));
+      if (cur == 0u) aot_mem.aot_store32(static_cast<std::uint32_t>(0x09AF6830), static_cast<std::uint32_t>(0x09AF6834u));
+    }
+    ctx.gpr[5] = 0u; // success
+    goto L_0899F90C;
+L_0899F92C: // GE ring-buf slot handler mode-1/3 — keep slot valid, return success
+    { uint32_t cur = aot_mem.aot_load32(static_cast<std::uint32_t>(0x09AF6830));
+      if (cur == 0u) aot_mem.aot_store32(static_cast<std::uint32_t>(0x09AF6830), static_cast<std::uint32_t>(0x09AF6834u));
+    }
+    ctx.gpr[5] = 0u;
+    goto L_0899F90C;
+L_0899F980: // GE ring-buf slot handler mode-2/4 — keep slot valid, return success
+    { uint32_t cur = aot_mem.aot_load32(static_cast<std::uint32_t>(0x09AF6830));
+      if (cur == 0u) aot_mem.aot_store32(static_cast<std::uint32_t>(0x09AF6830), static_cast<std::uint32_t>(0x09AF6834u));
+    }
+    ctx.gpr[5] = 0u;
+    goto L_0899F90C;
 L_0899F90C:
     ctx.gpr[31] = (aot_mem.aot_load32(ctx.gpr[29] + static_cast<std::uint32_t>(8)));
     ctx.gpr[17] = (aot_mem.aot_load32(ctx.gpr[29] + static_cast<std::uint32_t>(4)));
@@ -50606,6 +50642,8 @@ L_089A0000:
 L_089A001C:
     ctx.gpr[13] = (2479u << 16u);
     ctx.gpr[9] = (aot_mem.aot_load32(ctx.gpr[13] + static_cast<std::uint32_t>(26672)));
+    { const uint32_t _dp = ctx.gpr[9] ? aot_mem.aot_load32(ctx.gpr[9]+8) : 0u;
+      if (ctx.gpr[9] == 0u || _dp == 0u) { jump_target = ctx.gpr[31]; ctx.pc = jump_target; local_pc = jump_target; if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; } return; } }
     ctx.gpr[12] = (std::bit_cast<std::uint32_t>(ctx.fpr[12]));
     ctx.gpr[5] = (std::bit_cast<std::uint32_t>(ctx.fpr[13]));
     ctx.gpr[6] = (aot_mem.aot_load32(ctx.gpr[9] + static_cast<std::uint32_t>(8)));
@@ -50625,7 +50663,8 @@ L_089A001C:
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_089A0060:
+L_089A0060: // FUN_089a0060: GE shutdown (zeros GE_struct+72 and GE_struct_ptr)
+    { std::printf("[DBG] 089A0060 GE_shutdown ra=0x%08X\n", ctx.gpr[31]); }
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-16));
     ctx.gpr[3] = (2479u << 16u);
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(4), ctx.gpr[17]);
@@ -50691,6 +50730,8 @@ L_089A00E8:
 L_089A00F4:
     ctx.gpr[9] = (2479u << 16u);
     ctx.gpr[11] = (aot_mem.aot_load32(ctx.gpr[9] + static_cast<std::uint32_t>(26672)));
+    { const uint32_t _dp = ctx.gpr[11] ? aot_mem.aot_load32(ctx.gpr[11]+8) : 0u;
+      if (ctx.gpr[11] == 0u || _dp == 0u) { ctx.gpr[2] = 0u; jump_target = ctx.gpr[31]; ctx.pc = jump_target; local_pc = jump_target; if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; } return; } }
     ctx.gpr[14] = (ctx.gpr[4] + static_cast<std::uint32_t>(3));
     ctx.gpr[14] = ((ctx.gpr[14] & ~0x00000003u) | ((0u & 0x00000003u) << 0u));
     ctx.gpr[9] = (aot_mem.aot_load32(ctx.gpr[11] + static_cast<std::uint32_t>(8)));
@@ -50742,6 +50783,7 @@ L_089A0170:
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
 L_089A0180:
+    { std::printf("[DBG] 089A0180 set_dlptr=0x%08X ra=0x%08X\n", ctx.gpr[4], ctx.gpr[31]); }
     ctx.gpr[3] = (2479u << 16u);
     ctx.gpr[5] = (aot_mem.aot_load32(ctx.gpr[3] + static_cast<std::uint32_t>(26672)));
     jump_target = ctx.gpr[31];
@@ -50771,6 +50813,21 @@ L_089A01A0:
     ctx.pc = jump_target;
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+    return;
+L_089A01BC: // case 0: sceGeDrawSync(param_2)
+    ctx.gpr[4] = ctx.gpr[5];
+    ctx.gpr[31] = (0x089A01C4u);
+    if (rt.invoke_chained_direct<&recomp_unit_0014_entry, 14u, 178u, 0x089C5A80u>(ctx, &aot_mem) && ctx.pc == 0x089A01C4u) goto L_089A01C4;
+    return;
+L_089A01D8: // case 3: sceGeListSync(DAT_09af6800)
+    ctx.gpr[4] = aot_mem.aot_load32(static_cast<std::uint32_t>(0x09AF6800));
+    ctx.gpr[31] = (0x089A01C4u);
+    if (rt.invoke_chained_direct<&recomp_unit_0014_entry, 14u, 172u, 0x089C5A48u>(ctx, &aot_mem) && ctx.pc == 0x089A01C4u) goto L_089A01C4;
+    return;
+L_089A01F0: // case 4: sceGeListSync(DAT_09af6804)
+    ctx.gpr[4] = aot_mem.aot_load32(static_cast<std::uint32_t>(0x09AF6804));
+    ctx.gpr[31] = (0x089A01C4u);
+    if (rt.invoke_chained_direct<&recomp_unit_0014_entry, 14u, 172u, 0x089C5A48u>(ctx, &aot_mem) && ctx.pc == 0x089A01C4u) goto L_089A01C4;
     return;
 L_089A01C4:
     ctx.gpr[31] = (aot_mem.aot_load32(ctx.gpr[29] + static_cast<std::uint32_t>(0)));
@@ -50875,6 +50932,12 @@ L_089A02D0:
 L_089A02E0:
     ctx.gpr[15] = (2479u << 16u);
     ctx.gpr[11] = (aot_mem.aot_load32(ctx.gpr[15] + static_cast<std::uint32_t>(26672)));
+    { const uint32_t _dlptr = ctx.gpr[11] ? aot_mem.aot_load32(ctx.gpr[11]+8) : 0u;
+      std::printf("[DBG] 089A02E0 ge_ctx=0x%08X dlptr=0x%08X ra=0x%08X\n", ctx.gpr[11], _dlptr, ctx.gpr[31]);
+      if (ctx.gpr[11] == 0u || _dlptr == 0u) { // GE context or dlptr null - skip safely
+          jump_target = ctx.gpr[31]; ctx.pc = jump_target; local_pc = jump_target;
+          if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; } return;
+      } }
     ctx.gpr[14] = ((ctx.gpr[5] >> 24u) & 0x0000000Fu);
     ctx.gpr[7] = (53760u << 16u);
     ctx.gpr[12] = (aot_mem.aot_load32(ctx.gpr[11] + static_cast<std::uint32_t>(8)));
@@ -52352,6 +52415,8 @@ L_089A12A4:
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
 L_089A12FC:
+    { const uint32_t _before = aot_mem.aot_load32(static_cast<uint32_t>(0x09AF6830));
+      std::printf("[DBG] 089A12FC cmd=%u flag=%u ctx=0x%08X ra=0x%08X\n", ctx.gpr[5], ctx.gpr[6], _before, ctx.gpr[31]); }
     ctx.gpr[3] = (ctx.gpr[5] < static_cast<std::uint32_t>(22) ? 1u : 0u);
     { const bool branch_taken = ctx.gpr[3] == 0u;
     ctx.gpr[8] = (ctx.gpr[4] + 0u);
@@ -53573,6 +53638,8 @@ L_089A22A4:
     ctx.gpr[8] = (2479u << 16u);
     ctx.gpr[7] = (ctx.gpr[8] + static_cast<std::uint32_t>(26552));
     aot_mem.aot_store32(ctx.gpr[8] + static_cast<std::uint32_t>(26552), 0u);
+    // Init: point DAT_09af6830 at slot-0 (GE_struct_base+76 = 0x09AF67F4)
+    aot_mem.aot_store32(ctx.gpr[8] + static_cast<std::uint32_t>(26672), static_cast<std::uint32_t>(0x09AF67F4u));
     jump_target = ctx.gpr[31];
     aot_mem.aot_store32(ctx.gpr[7] + static_cast<std::uint32_t>(4), 0u);
     ctx.pc = jump_target;

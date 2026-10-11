@@ -54,3 +54,7 @@ __pycache__/
 
 # Other Files
 Roadmap.pdf
+.aider*
+.claude*
+.continue*
+PROGRESS.json

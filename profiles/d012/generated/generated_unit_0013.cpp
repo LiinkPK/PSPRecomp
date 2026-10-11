@@ -7582,7 +7582,14 @@ L_089A4564:
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_089A457C:
+L_089A457C: // FUN_089a457c: atan2f(f12, f13) -> f0  (VFPU impl replaced with native)
+    ctx.fpr[0] = std::atan2f(ctx.fpr[12], ctx.fpr[13]);
+    jump_target = ctx.gpr[31];
+    ctx.pc = jump_target;
+    local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+    return;
+    // original VFPU body below (unreachable, kept for reference):
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-16));
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(4), std::bit_cast<std::uint32_t>(ctx.fpr[12]));
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(8), std::bit_cast<std::uint32_t>(ctx.fpr[13]));

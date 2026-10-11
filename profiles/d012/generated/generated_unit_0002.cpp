@@ -4889,6 +4889,10 @@ LOCAL_DISPATCH:
     case 0x088631C4u: goto L_088631C4;
     case 0x088631D0u: goto L_088631D0;
     case 0x088631E4u: goto L_088631E4;
+    case 0x08863208u: goto L_08863208;
+    case 0x0886330Cu: goto L_0886330C;
+    case 0x088634BCu: goto L_088634BC;
+    case 0x0886357Cu: goto L_0886357C;
     case 0x08863624u: goto L_08863624;
     case 0x0886362Cu: goto L_0886362C;
     case 0x0886364Cu: goto L_0886364C;
@@ -52315,6 +52319,7 @@ L_08862800:
     ctx.gpr[5] = (static_cast<std::uint32_t>(static_cast<std::int32_t>(static_cast<std::int16_t>(aot_mem.aot_load16(ctx.gpr[4] + static_cast<std::uint32_t>(0))))));
     ctx.gpr[6] = (aot_mem.aot_load32(ctx.gpr[4] + static_cast<std::uint32_t>(4)));
     jump_target = ctx.gpr[6];
+    { std::printf("[DBG] 08862800 vtbl_fptr=0x%08X gpr2=0x%08X\n", jump_target, ctx.gpr[2]); }
     ctx.gpr[31] = (0x0886281Cu);
     ctx.gpr[4] = (ctx.gpr[2] + ctx.gpr[5]);
     ctx.pc = jump_target;
@@ -53107,6 +53112,7 @@ L_08863048:
     ctx.gpr[9] = (aot_mem.aot_load32(ctx.gpr[4] + static_cast<std::uint32_t>(4)));
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(0), ctx.gpr[31]);
     jump_target = ctx.gpr[9];
+    { std::printf("[DBG] 0886307C vtbl_fptr=0x%08X\n", jump_target); }
     ctx.gpr[31] = (0x0886307Cu);
     ctx.gpr[4] = (ctx.gpr[7] + ctx.gpr[8]);
     ctx.pc = jump_target;
@@ -53276,6 +53282,35 @@ L_088631E4:
     ctx.gpr[31] = (aot_mem.aot_load32(ctx.gpr[29] + static_cast<std::uint32_t>(4)));
     jump_target = ctx.gpr[31];
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(16));
+    ctx.pc = jump_target;
+    local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+    return;
+L_08863208: // FUN_08863208 stub: UMD/DVD init - return 0 (no disc on PC)
+    { static bool once=false; if(!once){once=true; std::printf("[HLE] FUN_08863208 UMD init skipped\n");} }
+    ctx.gpr[2] = 0u;
+    jump_target = ctx.gpr[31];
+    ctx.pc = jump_target;
+    local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+    return;
+L_0886330C: // FUN_0886330C stub: resource loader - no-op during init (no data/ filesystem)
+    { static bool once=false; if(!once){once=true; std::printf("[HLE] FUN_0886330C resource load skipped\n");} }
+    jump_target = ctx.gpr[31];
+    ctx.pc = jump_target;
+    local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+    return;
+L_0886357C: // FUN_0886357C stub: module loader "disc0:/.../%s" - no-op
+    { static bool once=false; if(!once){once=true; std::printf("[HLE] FUN_0886357C module load skipped\n");} }
+    jump_target = ctx.gpr[31];
+    ctx.pc = jump_target;
+    local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+    return;
+L_088634BC: // FUN_088634BC stub: resource loader "data/%s" - no-op
+    { static bool once=false; if(!once){once=true; std::printf("[HLE] FUN_088634BC resource load skipped\n");} }
+    jump_target = ctx.gpr[31];
     ctx.pc = jump_target;
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
@@ -59266,6 +59301,10 @@ void register_generated_unit_2(Runtime &runtime) {
     runtime.register_function(0x088631C4u, &recomp_unit_0002, "recomp_unit_0002");
     runtime.register_function(0x088631D0u, &recomp_unit_0002, "recomp_unit_0002");
     runtime.register_function(0x088631E4u, &recomp_unit_0002, "recomp_unit_0002");
+    runtime.register_function(0x08863208u, &recomp_unit_0002, "recomp_unit_0002");
+    runtime.register_function(0x0886330Cu, &recomp_unit_0002, "recomp_unit_0002");
+    runtime.register_function(0x0886357Cu, &recomp_unit_0002, "recomp_unit_0002");
+    runtime.register_function(0x088634BCu, &recomp_unit_0002, "recomp_unit_0002");
     runtime.register_function(0x08863624u, &recomp_unit_0002, "recomp_unit_0002");
     runtime.register_function(0x0886362Cu, &recomp_unit_0002, "recomp_unit_0002");
     runtime.register_function(0x0886364Cu, &recomp_unit_0002, "recomp_unit_0002");

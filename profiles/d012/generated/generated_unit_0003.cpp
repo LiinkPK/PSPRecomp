@@ -28768,6 +28768,7 @@ L_0887197C:
     ctx.gpr[4] = (ctx.gpr[4] + ctx.gpr[7]);
     ctx.gpr[7] = (aot_mem.aot_load32(ctx.gpr[5] + static_cast<std::uint32_t>(4)));
     jump_target = ctx.gpr[7];
+    { std::printf("[DBG] 0887197C vtbl_fptr=0x%08X\n", jump_target); }
     ctx.gpr[31] = (0x088719A4u);
     ctx.gpr[5] = (ctx.gpr[6] | 0u);
     ctx.pc = jump_target;
@@ -46833,6 +46834,7 @@ L_0887D7B0:
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
 L_0887D7B8:
+    { std::printf("[DBG] 0887D7B8 entry: a0=0x%08X a1=0x%08X ra=0x%08X\n", ctx.gpr[4], ctx.gpr[5], ctx.gpr[31]); }
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-16));
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(0), ctx.gpr[16]);
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(4), ctx.gpr[17]);
@@ -46852,6 +46854,7 @@ L_0887D7D4:
     ctx.gpr[4] = (aot_mem.aot_load32(ctx.gpr[16] + static_cast<std::uint32_t>(27032)));
     ctx.gpr[5] = (ctx.gpr[5] + static_cast<std::uint32_t>(16));
     ctx.gpr[4] = (aot_mem.aot_load32(ctx.gpr[4] + static_cast<std::uint32_t>(20)));
+    { std::printf("[DBG] 0887D7B8 pool=0x%08X size=0x%X\n", ctx.gpr[4], ctx.gpr[5]); }
     ctx.gpr[8] = (0u | 1u);
     ctx.gpr[6] = (0u | 0u);
     ctx.gpr[7] = (0u | 0u);
@@ -49243,6 +49246,7 @@ L_0887EF84:
     return;
 L_0887EFBC:
     ctx.gpr[20] = (ctx.gpr[2] | 0u);
+    { std::printf("[DBG] 0887EFBC gpr20=0x%08X (DAT_09af682c)\n", ctx.gpr[20]); }
     ctx.gpr[31] = (0x0887EFC8u);
     ctx.gpr[4] = (0u | 0u);
     if (rt.invoke_chained_direct<&recomp_unit_0012_entry, 12u, 4528u, 0x0899FDC4u>(ctx, &aot_mem) && ctx.pc == 0x0887EFC8u) goto L_0887EFC8;
@@ -50994,6 +50998,7 @@ L_08880A28:
 L_08880A3C:
     aot_mem.aot_store16(ctx.gpr[29] + static_cast<std::uint32_t>(80), static_cast<std::uint16_t>(ctx.gpr[4]));
     ctx.gpr[4] = (aot_mem.aot_load16(ctx.gpr[29] + static_cast<std::uint32_t>(80)));
+    { std::printf("[DBG] 08880A3C gpr20=0x%08X gpr4=0x%X\n", ctx.gpr[20], ctx.gpr[4]); }
     ctx.gpr[6] = (aot_mem.aot_load16(ctx.gpr[20] + static_cast<std::uint32_t>(4)));
     { const std::int32_t dividend = static_cast<std::int32_t>(ctx.gpr[4]); const std::int32_t divisor = static_cast<std::int32_t>(ctx.gpr[6]); if (divisor == 0) { ctx.lo = dividend >= 0 ? 0xFFFFFFFFu : 1u; ctx.hi = static_cast<std::uint32_t>(dividend); } else if (dividend == static_cast<std::int32_t>(0x80000000u) && divisor == -1) { ctx.lo = 0x80000000u; ctx.hi = 0u; } else { ctx.lo = static_cast<std::uint32_t>(dividend / divisor); ctx.hi = static_cast<std::uint32_t>(dividend % divisor); } }
     ctx.gpr[6] = (aot_mem.aot_load8(ctx.gpr[20] + static_cast<std::uint32_t>(0)));

@@ -3755,9 +3755,9 @@ L_089C58C8:
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_089C58D0:
+L_089C58D0: // sceFontGetNumFontList - return 0 (no fonts on PC)
+    ctx.gpr[2] = 0u;
     jump_target = ctx.gpr[31];
-    // nop
     ctx.pc = jump_target;
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
