@@ -25757,9 +25757,11 @@ L_088D0130:
     ctx.gpr[7] = (0u | 0u);
     ctx.gpr[31] = (0x088D0158u);
     ctx.gpr[9] = (0u | 1u);
+    std::printf("[0130] calling alloc: a0=0x%08X a1(size)=0x%08X a2=%u\n", ctx.gpr[4], ctx.gpr[5], ctx.gpr[6]); fflush(stdout);
     if (rt.invoke_chained_direct<&recomp_unit_0002_entry, 2u, 3993u, 0x0885C6CCu>(ctx, &aot_mem) && ctx.pc == 0x088D0158u) goto L_088D0158;
     return;
 L_088D0158:
+    std::printf("[0158] alloc returned: 0x%08X\n", ctx.gpr[2]); fflush(stdout);
     ctx.gpr[7] = (aot_mem.aot_load8(ctx.gpr[29] + static_cast<std::uint32_t>(4)));
     ctx.gpr[4] = (aot_mem.aot_load32(ctx.gpr[29] + static_cast<std::uint32_t>(8)));
     ctx.gpr[5] = (aot_mem.aot_load32(ctx.gpr[29] + static_cast<std::uint32_t>(12)));
@@ -29567,6 +29569,7 @@ L_088D2948:
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
 L_088D2980:
+    std::printf("[2980] a0=0x%08X a1=0x%08X(buf) a2=%u a3=%u t0(mpk)=0x%08X t1=0x%08X ra=0x%08X\n", ctx.gpr[4], ctx.gpr[5], ctx.gpr[6], ctx.gpr[7], ctx.gpr[8], ctx.gpr[9], ctx.gpr[31]); fflush(stdout);
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-128));
     ctx.gpr[10] = (ctx.gpr[4] | 0u);
     ctx.gpr[4] = (ctx.gpr[7] & 255u);
@@ -29765,6 +29768,11 @@ L_088D2B2C:
     if (rt.invoke_chained_direct<&recomp_unit_0002_entry, 2u, 4791u, 0x08862854u>(ctx, &aot_mem) && ctx.pc == 0x088D2B40u) goto L_088D2B40;
     return;
 L_088D2B40:
+    if (ctx.gpr[16] < 0x08800000u || ctx.gpr[16] >= 0x0A000000u) {
+        // gpr[16] was clobbered by a callee — reload from stack slot 80
+        ctx.gpr[16] = (aot_mem.aot_load32(ctx.gpr[29] + static_cast<std::uint32_t>(80)));
+        { static bool once=false; if(!once){once=true; std::printf("[2B40] gpr[16] was invalid, reloaded from sp+80=0x%08X\n", ctx.gpr[16]); fflush(stdout);} }
+    }
     ctx.gpr[5] = (aot_mem.aot_load16(ctx.gpr[16] + static_cast<std::uint32_t>(0)));
     goto L_088D2B44;
 L_088D2B44:
