@@ -18,7 +18,7 @@
 - Calling between units uses `invoke_chained_direct<&unit_entry, UnitIdx, EntryID, TargetPC>` or `invoke_chained_call` (dynamic).
 - **Poisoning rule:** Registering a stub with a name NOT starting with `"recomp_unit_"` disables ALL generated code in that unit. Never register HLE stubs at addresses inside a unit you need working. Add the stub body directly as a label inside the generated unit file instead.
 - `lookup_function_override(addr)` only returns a stub if `direct_chainable_[idx] == nullptr` (i.e. the name does NOT start with `"recomp_unit_"`).
-- **All PSP syscall stubs live in unit 14** (`generated_unit_0014.cpp`). HLE implementations go there as label bodies — NOT in `d012_profile.cpp` via `s_handlers[]`.
+- **All PSP syscall stubs live in unit 14** (`generated_unit_0014.cpp`). HLE implementations go there as label bodies, NOT in `d012_profile.cpp` via `s_handlers[]`.
 
 ---
 
@@ -62,8 +62,8 @@ The game has its own internal GE manager (does **not** import `sceGeListEnQueue`
 
 **Key addresses in unit 12 (`generated_unit_0012.cpp`):**
 
-- `L_0899F5A4` — internal GE list enqueue. `gpr[4]` = list base (DL buffer), `gpr[5]` = stall address.
-- `L_0899F630` (line ~49711) — writes slot fields. `slot+8` = display list write pointer.
+- `L_0899F5A4`: internal GE list enqueue. `gpr[4]` = list base (DL buffer), `gpr[5]` = stall address.
+- `L_0899F630` (line ~49711). Writes slot fields. `slot+8` = display list write pointer.
 - `GE_struct` = `0x09AF67A8`. `GE_struct+72` = active slot pointer.
 - `DAT_09af6830` = `base+26672` = slot pointer used by all GE command writers.
 - Ring buffer: 5 slots at stride 252 bytes, base at `GE_struct+76 = 0x09AF67F4`.
@@ -77,7 +77,7 @@ The game has its own internal GE manager (does **not** import `sceGeListEnQueue`
 | `0x00000010` | `GE_struct+72` zeroed via error path `L_0899F7F8` | Commented-out zero-store in `L_0899F7F8` |
 | `0x50000009` | `dlptr = 0x9F000200` passes null check but fails range | Upgraded all 52 guards to range-check: `< 0x08800000 \|\| >= 0x09F00000` |
 | `0x9F000208` | `slot+8` stored `stall & 0x1FFFFFFF = 0x1F000200` instead of list base | `L_0899F630` line ~49715: store `gpr[16] & 0x0FFFFFFF` (list base). Follows PPSSPP: `slot.pc = startpc = list & 0x0FFFFFFF` |
-| Infinite loop / null-PC on cmds 0–21 | `L_089A1308` emitted as indirect jump through `RAM[table+cmd*4]` — recompiler mis-decoded MIPS switch table as a jump-through-pointer. Actual function `FUN_089a12fc` is a switch that writes one GE DL word per cmd. | Replaced `L_089A1308` with full switch implementation from pseudocode. Also added unit-14 no-op stubs + `register_function` for `0x089D18F8`–`0x089D1948`. |
+| Infinite loop / null-PC on cmds 0–21 | `L_089A1308` emitted as indirect jump through `RAM[table+cmd*4]`, recompiler mis-decoded MIPS switch table as a jump-through-pointer. Actual function `FUN_089a12fc` is a switch that writes one GE DL word per cmd. | Replaced `L_089A1308` with full switch implementation from pseudocode. Also added unit-14 no-op stubs + `register_function` for `0x089D18F8`–`0x089D1948`. |
 
 ---
 
@@ -111,7 +111,7 @@ VRAM is accessible via `rt.memory().vram_bytes()`. A host window (SDL2/Win32) is
 
 All PSP import stubs cluster in unit 14 (`0x089C4040`–`0x089C6040`). The generated unit already has `jr $ra / nop` for each stub VA and registers them as `"recomp_unit_0014"`. This means:
 
-- `s_handlers[VA]` in `d012_profile.cpp` is **never reached** — the generated unit intercepts first
+- `s_handlers[VA]` in `d012_profile.cpp` is **never reached**. The generated unit intercepts first
 - `register_hle(library, nid, fn)` is also dead for these — `invoke_import` is never called from AOT units
 
 **Fix:** Implement all HLE logic directly as label bodies in `generated_unit_0014.cpp`.
@@ -137,8 +137,8 @@ All PSP import stubs cluster in unit 14 (`0x089C4040`–`0x089C6040`). The gener
 **`DAT_089D69E0` (render object ptr) is now set to `0x08C13A94` by `FUN_088769CC`.** ✅
 **`FUN_08883EE8` (DL builder) runs every frame with the correct render object pointer.** ✅
 **`FUN_0893354C` boot gate check now passes (archive file handles 2 & 3 returned).** ✅
-**`FUN_08862854` synchronous file I/O wired up — reads directly into guest buffer.** ✅
-**`FUN_08869954` returns 0 — buffer still zero because game data files don't exist.** ❌
+**`FUN_08862854` synchronous file I/O wired up. Reads directly into guest buffer.** ✅
+**`FUN_08869954` returns 0. Buffer still zero because game data files don't exist.** ❌
 
 ### What was done this session
 
