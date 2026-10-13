@@ -1,5 +1,5 @@
 {
-  "input": "C:\\Users\\javi_\\Documents\\GitHub\\D012-decomp\\original\\ULES01505_FFSTJP.BIN",
+  "input": "<path-to-ULES01505_FFSTJP.BIN>",
   "sha256": "1ea4fd3a718191b79928be74ba4d775caeab711ce717f67232552769deac9e52",
   "elf_type": 2,
   "is_psp_prx": false,
