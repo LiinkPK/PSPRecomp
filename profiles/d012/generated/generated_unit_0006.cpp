@@ -29768,6 +29768,7 @@ L_088D2B2C:
     if (rt.invoke_chained_direct<&recomp_unit_0002_entry, 2u, 4791u, 0x08862854u>(ctx, &aot_mem) && ctx.pc == 0x088D2B40u) goto L_088D2B40;
     return;
 L_088D2B40:
+    std::printf("[2B40] REACHED gpr[16]=0x%08X sp=0x%08X\n", ctx.gpr[16], ctx.gpr[29]); fflush(stdout);
     if (ctx.gpr[16] < 0x08800000u || ctx.gpr[16] >= 0x0A000000u) {
         // gpr[16] was clobbered by a callee — reload from stack slot 80
         ctx.gpr[16] = (aot_mem.aot_load32(ctx.gpr[29] + static_cast<std::uint32_t>(80)));

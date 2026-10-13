@@ -131,67 +131,60 @@ All PSP import stubs cluster in unit 14 (`0x089C4040`–`0x089C6040`). The gener
 
 ---
 
-## Current status (as of 2026-10-13, session 3)
+## Current status (as of 2026-10-13, session 4)
 
 **Rendering gate `DAT_089D69DC` is now open (dc=01) from frame 2 onward.** ✅
 **`DAT_089D69E0` (render object ptr) is now set to `0x08C13A94` by `FUN_088769CC`.** ✅
 **`FUN_08883EE8` (DL builder) runs every frame with the correct render object pointer.** ✅
-**`FUN_0893354C` boot gate check now passes (archive file handles 2 & 3 returned).** ✅
-**`FUN_08862854` synchronous file I/O wired up. Reads directly into guest buffer.** ✅
-**`FUN_08869954` returns 0. Buffer still zero because game data files don't exist.** ❌
+**`FUN_0893354C` boot gate check passes; all 47+ subsystem inits fire.** ✅
+**`FUN_08869954` returns 1 (MPK magic check passes). `main.bin` loaded correctly.** ✅
+**Audio channel search infinite loop bypassed (`FUN_088A0EEC` stub → -1).** ✅
+**`FUN_08869AB4` null deref fixed (not-found path instead of self-loop).** ✅
+**Menu MPK files extracted from PACKAGE.BIN, game proceeds past archive init.** ✅
+**Current blocker: `FUN_088D2B40` crash — gpr[16] clobbered before aot_load16.** ❌
 
-### What was done this session
+### What was done this session (session 4)
 
-All `libsuppreacc.prx` accessibility barriers were bypassed with no-op stubs:
-- `L_0886EEBC` (FUN_0886EEBC): `sceKernelLoadModule` stub → returns handle=1, skips busy-loop
-- `L_089C5D38` (scesupPreAcc_NID_86DEBD66): returns 0
-- `L_089C5D18` (scesupPreAcc_NID_13AE25B3): returns 0
-- `L_089C5D30` (scesupPreAcc_NID_348BA3E2): returns 0
-- `L_0886F688` (FUN_0886F688): streaming worker init stub → returns 0 (success)
-- `L_0886FFD0` (FUN_0886FFD0): scesupPreAcc_NID_28C5F696 wrapper stub → returns 0
-- `L_0886F7A8` (FUN_0886F7A8): accessibility worker validation stub → returns 0
+#### main.bin extraction
+- Wrote C# scanner (`FindMainBin.cs`, `FindLargeMPK.cs`) to scan `PACKAGE.BIN` for MPK blocks
+- Identified `PACKAGE.BIN offset 0x2000`, size `0x129800` (1,218,560 bytes) as `general_archive/main/main.bin`
+- Extracted to `original/general_archive/main/main.bin` — starts with `MPK ` magic ✅
+- Created minimal 16-byte MPK stub for `original/general_archive/main/JP/main_lang.bin` (0 entries)
+- Created 84-byte zero stub for `original/language.bin`
+- Created 900-byte PSF stub for `original/save/JP/PARAM.SFO`
 
-These stubs enable `FUN_0886F424` to execute, which sets `DAT_089D5FD1=1` (streaming ready).
+#### Crash fixes
+- **Null vtable audio loop** (`FUN_088A0EEC`, `generated_unit_0004.cpp`): stubbed to return -1 immediately, bypassing 32-slot null-function-pointer spin
+- **`FUN_08869AB4` null deref** (`L_088D2A8C`, `generated_unit_0006.cpp`): null guard jumps to `L_088D2AA0` (not-found path) instead of returning to self (ra = same address)
 
-`FUN_08862C40` and `FUN_08862854` were replaced with synchronous stubs:
-- `FUN_08862C40(path, flags)`: registers path→handle in a static table, returns sequential handle
-- `FUN_08862854(path, buf, size, flags)`: looks up handle by path, reads file from host filesystem into guest buffer at `buf_addr`, returns same handle
-- File read uses `d012_get_game_root()` + path, stripping `disc0:` prefix
-- `d012_get_game_root()` added to `d012_profile.cpp` as `extern "C"` function
+#### Menu MPK extraction
+- Found `menu_pk_loading_seq_0.bin` at `PACKAGE.BIN offset 0x12B800` via C# scanner
+- MPK at that offset has 21 entries; extracted all to `original/`:
+  - `common.bin`, `pause_menu.bin`, `save_data.bin`, `bgm_name.bin`, `friend_card.bin`
+  - `ability.bin`, `accessory.bin`, `accessory_help.bin`, `item.bin`, `item_help.bin`
+  - `party_command.bin`, `menu_pk_loading_seq_0.bin`, `menu_pk_loading_gim_0.bin`
+  - `auto_save.gim`, `replay_CO.gim`, `ICON0.PNG`, `ICON0_NEW.PNG`
+  - `menu_lpk_loading_seq_0.bin`, `menu_lpk_loading_gim_0.bin`
+  - `dungeon_skill.bin`, `dungeon_skill_help.bin`
+- Saved full `menu.bin` MPK block to `original/general_archive/field/menu.bin`
 
-### Current blocker: game data files don't exist
+#### main.bin MPK contents (13 entries)
+`battle.bin`, `objentry.bin`, `system.bin`, `mapentry.bin`, `manual_param.bin`, `ptcommand.bin`, `voice_priority_parameter.bin`, `resident.frr`, `snd_menu.scd`, `snd_common.scd`, `bgm_entry.bin`, `se_override.bin`, `assist.bin`
 
-`FUN_08869954` reads the guest buffer to check the archive magic (`0x204B504D` = "KPM ").
-The buffer is still all zeros because the files don't exist:
+### Current blocker: gpr[16] clobbered at `L_088D2B40`
 
+After `FUN_08869AB4` returns null and takes the not-found path through `L_088D2AA0`, the code calls several functions (including `FUN_088FE944` in unit 7). One of these clobbers gpr[16] (s0, a callee-saved register), leaving it as `0x0000000A` instead of the MPK chunk pointer `0x09EFFB20`. Then `L_088D2B40` executes `aot_load16(gpr[16]+0)` → crash at `0x0000000A`.
+
+A guard to reload gpr[16] from sp+80 was added but the full rebuild is in progress to confirm it fires.
+
+### Known archive paths in ELF binary (baked in at compile time)
 ```
-[08862854] file NOT FOUND: '.../original/general_archive/main/main.bin'
-[354C] FUN_08869954 returned 0x00000000  ← magic check fails, returns "loaded" = 0
+general_archive/main/main.bin          ← loaded ✅
+general_archive/main/JP/main_lang.bin  ← stub (0 entries)
+general_archive/main/main_prologus.bin ← not yet loaded
+general_archive/main/JP/main_lang_prologus.bin ← not yet loaded
+general_archive/field/menu.bin         ← extracted but not yet registered
+general_archive/field/JP/menu_lang.bin ← not yet loaded
+general_archive/field/field.bin        ← not yet loaded
+general_archive/field/ZQ/field_lang.bin ← not yet loaded
 ```
-
-When `FUN_08869954` returns 0, the "fast path" is taken which skips all subsystem init.
-
-### Required files (relative to `g_game_root` = directory containing the BIN)
-
-Place these files in the `original/` directory (or adjust `g_game_root` in `main.cpp`):
-
-| Path | Size (approx) | Purpose |
-|------|--------------|---------|
-| `general_archive/main/main.bin` | ~1.5MB | Main game archive (models, textures, scripts) |
-| `general_archive/main/JP/main_lang.bin` | ~512KB | Japanese language pack |
-| `language.bin` | 84 bytes | Language selection file |
-| `save/JP/PARAM.SFO` | ~900 bytes | PSP save metadata |
-
-**How to extract:** Use `UMDGen` or `7-Zip` to open the UMD ISO for ULES01505 (Dissidia 012 Final Fantasy).
-Extract the `PSP_GAME/USRDIR/` subtree. The archive files are inside `PSP_GAME/USRDIR/`.
-
-### After files are in place, expected next step
-
-`FUN_08869954` will find the archive magic and return non-zero → `FUN_0893354C` proceeds to parse the archive and call all subsystem inits (lines 72–127 of pseudocode/0893354C.c):
-- `FUN_088a0c10()` — sound subsystem
-- `FUN_088a52ec()` — audio
-- `FUN_08885c04()` — render object list
-- `FUN_088ce968()` — camera
-- etc.
-
-After those inits, `DAT_09B49128` (render object list head) will be populated, which allows `FUN_088838F8` (render task) to enqueue objects, populating `DAT_09AF719C` (DL chain root), leading to first pixels.
