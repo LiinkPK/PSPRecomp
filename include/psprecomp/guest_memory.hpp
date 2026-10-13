@@ -49,7 +49,7 @@ public:
     // from 234 separate translation units, where an out-of-line accessor is a
     // real call into psprecomp_core.
     [[nodiscard]] static constexpr std::uint32_t canonical(std::uint32_t address) noexcept {
-        return address & 0x1FFFFFFFu;
+        return address & 0x1DFFFFFFu; // strip bit 25: maps 0x0A000000 (uncached RAM) to 0x08000000
     }
     [[nodiscard]] bool contains(std::uint32_t address, std::size_t length = 1u) const noexcept;
 
@@ -128,7 +128,7 @@ public:
               write_watch_enabled_(write_watch) {}
         [[nodiscard]] PSPRECOMP_MEMORY_FAST_PATH static constexpr std::uint32_t ram_offset_of_fast(
             std::uint32_t address) noexcept {
-            return (address & 0x1FFFFFFFu) - GuestMemory::kPhysicalBase;
+            return (address & 0x1DFFFFFFu) - GuestMemory::kPhysicalBase;
         }
         GuestMemory *owner_{};
         std::uint8_t *ram_data_{};
@@ -262,7 +262,7 @@ private:
     // EDRAM included -- wraps to a value far above any RAM size, so a single
     // unsigned compare rejects it along with every out-of-range access.
     [[nodiscard]] PSPRECOMP_MEMORY_FAST_PATH static std::uint32_t ram_offset_of(std::uint32_t address) noexcept {
-        return (address & 0x1FFFFFFFu) - kPhysicalBase;
+        return (address & 0x1DFFFFFFu) - kPhysicalBase;
     }
 
     // Guest memory is little-endian, so on a little-endian host these are the

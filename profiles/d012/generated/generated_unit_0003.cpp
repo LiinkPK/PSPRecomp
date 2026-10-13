@@ -30230,6 +30230,14 @@ L_0887263C:
     ctx.gpr[4] = (2205u << 16u);
     ctx.gpr[11] = (aot_mem.aot_load32(ctx.gpr[4] + static_cast<std::uint32_t>(-26004)));
     ctx.gpr[10] = (aot_mem.aot_load32(ctx.gpr[4] + static_cast<std::uint32_t>(-26008)));
+    if (ctx.gpr[8] < 0x08800000u || ctx.gpr[8] >= 0x09F00000u) {
+        std::printf("[0887263C] gpr[8]=0x%08X invalid, skipping (ra=0x%08X)\n", ctx.gpr[8], ctx.gpr[31]); fflush(stdout);
+        jump_target = ctx.gpr[31];
+        ctx.pc = jump_target;
+        local_pc = jump_target;
+        if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+        return;
+    }
     ctx.gpr[5] = (aot_mem.aot_load32(ctx.gpr[8] + static_cast<std::uint32_t>(4)));
     ctx.gpr[4] = (aot_mem.aot_load32(ctx.gpr[8] + static_cast<std::uint32_t>(0)));
     ctx.gpr[3] = (ctx.gpr[11] | 0u);
@@ -30303,6 +30311,16 @@ L_088726B0:
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(0), ctx.gpr[16]);
     ctx.gpr[16] = (ctx.gpr[4] | 0u);
     ctx.gpr[5] = (aot_mem.aot_load32(ctx.gpr[16] + static_cast<std::uint32_t>(64)));
+    if (ctx.gpr[5] < 0x08800000u || ctx.gpr[5] >= 0x09F00000u) {
+        { static bool once=false; if(!once){once=true; std::printf("[088726B0] gpr[5]=0x%08X invalid (gpr16+64), skipping display func\n", ctx.gpr[5]); fflush(stdout);} }
+        ctx.gpr[16] = (aot_mem.aot_load32(ctx.gpr[29] + static_cast<std::uint32_t>(0)));
+        ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(16));
+        jump_target = ctx.gpr[31];
+        ctx.pc = jump_target;
+        local_pc = jump_target;
+        if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+        return;
+    }
     ctx.gpr[7] = (aot_mem.aot_load32(ctx.gpr[5] + static_cast<std::uint32_t>(4)));
     ctx.gpr[8] = (2205u << 16u);
     ctx.gpr[6] = (aot_mem.aot_load32(ctx.gpr[5] + static_cast<std::uint32_t>(0)));
@@ -30328,6 +30346,10 @@ L_088726F4:
         { static bool once=false; if(!once){once=true; std::printf("[088726F4] gpr[5]=0x%08X out of RAM, skipping\n", ctx.gpr[5]); fflush(stdout);} }
         goto L_08872714;
     }
+    if (ctx.gpr[4] < 0x08800000u || ctx.gpr[4] >= 0x09F00000u) {
+        { static bool once=false; if(!once){once=true; std::printf("[088726F4] gpr[4]=0x%08X (gpr16+76) out of RAM, skipping\n", ctx.gpr[4]); fflush(stdout);} }
+        goto L_08872714;
+    }
     ctx.gpr[8] = (ctx.gpr[4] | 0u);
     ctx.gpr[7] = (aot_mem.aot_load32(ctx.gpr[5] + static_cast<std::uint32_t>(4)));
     ctx.gpr[6] = (aot_mem.aot_load32(ctx.gpr[5] + static_cast<std::uint32_t>(0)));
@@ -30341,6 +30363,10 @@ L_08872708:
     goto L_08872714;
 L_08872714:
     ctx.gpr[5] = (ctx.gpr[5] + static_cast<std::uint32_t>(32));
+    if (ctx.gpr[5] < 0x08800000u || ctx.gpr[5] >= 0x09F00000u) {
+        { static bool once=false; if(!once){once=true; std::printf("[08872714] gpr[5]=0x%08X invalid, skipping GE call\n", ctx.gpr[5]-32); fflush(stdout);} }
+        goto L_08872720;
+    }
     ctx.gpr[31] = (0x08872720u);
     ctx.gpr[4] = (ctx.gpr[16] + static_cast<std::uint32_t>(32));
     if (rt.invoke_chained_direct<&recomp_unit_0012_entry, 12u, 4923u, 0x089A3868u>(ctx, &aot_mem) && ctx.pc == 0x08872720u) goto L_08872720;
@@ -30919,14 +30945,7 @@ L_08872ED8:
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_08872F08: // display task — reads VRAM, stub until VRAM access is supported
-    { static bool once=false; if(!once){once=true; std::printf("[08872F08] display task stub\n"); fflush(stdout);} }
-    ctx.gpr[2] = 0u;
-    jump_target = ctx.gpr[31];
-    ctx.pc = jump_target; local_pc = jump_target;
-    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
-    return;
-L_08872F08_orig_unused:
+L_08872F08:
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-16));
     ctx.gpr[4] = (2205u << 16u);
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(0), ctx.gpr[16]);

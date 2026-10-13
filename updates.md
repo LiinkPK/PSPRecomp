@@ -131,7 +131,7 @@ All PSP import stubs cluster in unit 14 (`0x089C4040`–`0x089C6040`). The gener
 
 ---
 
-## Current status (as of 2026-10-14, session 5)
+## Current status (as of 2026-10-14, session 6)
 
 **Rendering gate `DAT_089D69DC` is now open (dc=01) from frame 2 onward.** ✅
 **`DAT_089D69E0` (render object ptr) is now set to `0x08C13A94` by `FUN_088769CC`.** ✅
@@ -142,7 +142,8 @@ All PSP import stubs cluster in unit 14 (`0x089C4040`–`0x089C6040`). The gener
 **`FUN_08869AB4` null deref fixed (not-found path instead of self-loop).** ✅
 **Menu MPK files extracted from PACKAGE.BIN, game proceeds past archive init.** ✅
 **Init sequence completes. Task scheduler runs 8+ tasks per frame.** ✅
-**Current blocker: task loop — CHAIN-BAD tasks returning corrupt ra=0x8888505B, unregistered 0x08C13B40.** ❌
+**`guest_memory` canonical() mask updated: `0x0A000000` (uncached RAM mirror) now maps correctly to `0x08000000`.** ✅
+**Current blocker: display task `FUN_08872F08` — crashes fixed; next crash TBD after rebuild.** ❓
 
 ### What was done this session (session 4)
 
@@ -182,6 +183,13 @@ All PSP import stubs cluster in unit 14 (`0x089C4040`–`0x089C6040`). The gener
 | `0x089389E0` unregistered jump-table target | Added stub + dispatch case in unit 9 | `generated_unit_0009.cpp` |
 | `0x001ECF3B` unregistered (bad fn ptr) | Guard at `L_0886313C` skips call if outside RAM | `generated_unit_0002.cpp` |
 | `FUN_08872F08` VRAM read crash | Stubbed — reads `0x0A000000` (VRAM mirror), unsupported | `generated_unit_0003.cpp` |
+
+### Session 6 crash fixes
+
+| Crash | Root cause | Fix | File |
+|---|---|---|---|
+| `0x0A000004` in `FUN_08872F08` display task | `0x0A000000` = uncached RAM mirror; `canonical()` mask `0x1FFFFFFF` didn't remap it to `0x08000000` | Changed mask to `0x1DFFFFFFu` (strips bit 25) in `guest_memory.hpp` — `ram_offset_of`, `ram_offset_of_fast`, `canonical` | `include/psprecomp/guest_memory.hpp` |
+| Guards at `L_088726B0`, `L_088726F4`, `L_0887263C` | Added during investigation; not the real crash path (crash was in the memory layer) | Left in as defensive checks | `generated_unit_0003.cpp` |
 
 ### Current blocker: task loop — CHAIN-BAD / unregistered 0x08C13B40
 
