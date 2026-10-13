@@ -45,6 +45,7 @@ add_executable(d012_native
     "${D012_PROFILE_DIR}/host/main.cpp"
     "${D012_PROFILE_DIR}/host/d012_profile.cpp"
     "${D012_PROFILE_DIR}/host/win32_display.cpp"
+    "${D012_PROFILE_DIR}/host/ge_render.cpp"
 )
 
 target_include_directories(d012_native PRIVATE

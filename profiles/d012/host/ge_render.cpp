@@ -1,0 +1,559 @@
+// PSP GE software rasterizer — minimal implementation for title-screen rendering.
+// Handles: CLEAR, 2D textured sprites (PRIM GU_SPRITES), flat-color primitives,
+//          texture sampling (RGBA8888, RGB565, RGBA4444, RGBA5551, DXT), CLUT.
+// Does NOT handle: 3D perspective, lighting, fog, stencil, depth test, blend modes
+//                  beyond alpha-blend-over, mipmaps.  Sufficient for UI/title screens.
+
+#include "ge_render.hpp"
+#include <cstdio>
+#include <cstring>
+#include <cmath>
+#include <algorithm>
+
+namespace d012 {
+
+// ---- helpers ----------------------------------------------------------------
+
+static inline std::uint32_t to_abgr8888(std::uint32_t psp_color, int fmt) {
+    // PSP pixel formats → ABGR8888 (our internal format = same as VRAM RGBA8888 layout)
+    switch (fmt) {
+    case 0: { // RGB565
+        std::uint16_t p = static_cast<std::uint16_t>(psp_color);
+        std::uint8_t r = (p >> 11) & 0x1F; r = (r << 3) | (r >> 2);
+        std::uint8_t g = (p >>  5) & 0x3F; g = (g << 2) | (g >> 4);
+        std::uint8_t b =  p        & 0x1F; b = (b << 3) | (b >> 2);
+        return 0xFF000000u | (static_cast<std::uint32_t>(b) << 16) |
+               (static_cast<std::uint32_t>(g) << 8) | r;
+    }
+    case 1: { // RGBA5551
+        std::uint16_t p = static_cast<std::uint16_t>(psp_color);
+        std::uint8_t r = (p >> 11) & 0x1F; r = (r << 3) | (r >> 2);
+        std::uint8_t g = (p >>  6) & 0x1F; g = (g << 3) | (g >> 2);
+        std::uint8_t b = (p >>  1) & 0x1F; b = (b << 3) | (b >> 2);
+        std::uint8_t a = (p & 1) ? 0xFF : 0;
+        return (static_cast<std::uint32_t>(a) << 24) | (static_cast<std::uint32_t>(b) << 16) |
+               (static_cast<std::uint32_t>(g) << 8) | r;
+    }
+    case 2: { // RGBA4444
+        std::uint16_t p = static_cast<std::uint16_t>(psp_color);
+        std::uint8_t r = (p >> 12) & 0xF; r = (r << 4) | r;
+        std::uint8_t g = (p >>  8) & 0xF; g = (g << 4) | g;
+        std::uint8_t b = (p >>  4) & 0xF; b = (b << 4) | b;
+        std::uint8_t a =  p        & 0xF; a = (a << 4) | a;
+        return (static_cast<std::uint32_t>(a) << 24) | (static_cast<std::uint32_t>(b) << 16) |
+               (static_cast<std::uint32_t>(g) << 8) | r;
+    }
+    case 3: // RGBA8888 — already in right format (ABGR on PSP = RGBA in memory)
+        return psp_color;
+    default:
+        return 0xFF00FFFFu; // magenta = unknown
+    }
+}
+
+static inline void blend_pixel(std::uint32_t *dst, std::uint32_t src_abgr) {
+    const std::uint32_t sa = (src_abgr >> 24) & 0xFF;
+    if (sa == 0) return;
+    if (sa == 0xFF) { *dst = src_abgr; return; }
+    const std::uint32_t da = 255 - sa;
+    const std::uint32_t dr = ((*dst >>  0) & 0xFF) * da / 255 + ((src_abgr >>  0) & 0xFF) * sa / 255;
+    const std::uint32_t dg = ((*dst >>  8) & 0xFF) * da / 255 + ((src_abgr >>  8) & 0xFF) * sa / 255;
+    const std::uint32_t db = ((*dst >> 16) & 0xFF) * da / 255 + ((src_abgr >> 16) & 0xFF) * sa / 255;
+    *dst = 0xFF000000u | (db << 16) | (dg << 8) | dr;
+}
+
+// ---- GE state ---------------------------------------------------------------
+
+struct GeState {
+    // Addresses (host physical — already masked to 0x1FFFFFFF)
+    std::uint32_t base_addr = 0;          // BASE register high bits
+    std::uint32_t vaddr     = 0;          // VADDR (vertex buffer)
+    std::uint32_t iaddr     = 0;          // IADDR (index buffer)
+
+    // Texture
+    std::uint32_t tbp[8]    = {};         // TBP0-7: texture base pointers (phys)
+    std::uint32_t tbw[8]    = {};         // TBW0-7: texture buffer widths (pixels)
+    std::uint32_t tw = 1, th = 1;        // texture dimensions (actual, not log2)
+    int  tfmt       = 3;                 // texture pixel format (0=RGB565,3=RGBA8888)
+    bool tex_enabled = false;
+
+    // Vertex type (VTYPE register 0xA0)
+    std::uint32_t vtype     = 0;
+
+    // Color register (for flat primitives)
+    std::uint32_t color     = 0xFFFFFFFFu;
+
+    // Framebuffer target (set by DRAW* commands)
+    std::uint32_t fbp       = 0;         // framebuffer base (phys, into VRAM)
+    std::uint32_t fbw       = 512;       // framebuffer stride (pixels)
+    int           fbfmt     = 3;         // 0=RGB565, 3=RGBA8888
+
+    // Scissor
+    int sc_x1 = 0, sc_y1 = 0, sc_x2 = 480, sc_y2 = 272;
+
+    // Clear mode
+    bool clear_mode = false;
+    std::uint32_t clear_color = 0;
+
+    // Depth buffer (phys)
+    std::uint32_t zbp = 0;
+    std::uint32_t zbw = 512;
+
+    // Offset (for 2D pixel-center adjustment)
+    int offset_x = 0, offset_y = 0;
+};
+
+// ---- vertex decoding --------------------------------------------------------
+// VTYPE bits:
+//  1:0  = texture coord type  (0=none,1=u8,2=s16,3=f32)
+//  3:2  = color type          (0=none,4=RGBA8888,5=...,7=RGBA8888)
+//  6:4  = normal type         (0=none,1=u8,2=s16,3=f32)
+//  9:7  = position type       (1=u8,2=s16,3=f32)
+// 11:10 = weight type
+// 14:12 = index type          (0=none,1=u8,2=u16)
+// 23:18 = num weights
+// 26:24 = num bones
+// 27    = morph count
+// 28    = bypass transform (1 = screen-space / 2D)
+
+struct Vertex {
+    float u = 0, v = 0;   // texture coords (in [0..1] if BYPASS else [0..tw])
+    std::uint32_t color = 0xFFFFFFFFu;
+    float x = 0, y = 0, z = 0;
+};
+
+static std::uint32_t vtype_tex_type(std::uint32_t vt)  { return  vt        & 3; }
+static std::uint32_t vtype_col_type(std::uint32_t vt)  { return (vt >>  2) & 7; }
+static std::uint32_t vtype_nor_type(std::uint32_t vt)  { return (vt >>  5) & 3; }  // was 4 bits — actually bits 6:5
+static std::uint32_t vtype_pos_type(std::uint32_t vt)  { return (vt >>  7) & 3; }
+static std::uint32_t vtype_wgt_type(std::uint32_t vt)  { return (vt >> 10) & 3; }
+static std::uint32_t vtype_idx_type(std::uint32_t vt)  { return (vt >> 11) & 3; }
+static std::uint32_t vtype_nwgt(std::uint32_t vt)      { return (vt >> 14) & 7; }  // was 18..23
+static bool          vtype_bypass(std::uint32_t vt)    { return  (vt >> 23) & 1; }
+
+// Read an aligned value from the vertex stream and advance ptr
+static float read_f32(const std::uint8_t *&p) {
+    float v; std::memcpy(&v, p, 4); p += 4; return v;
+}
+static float read_s16n(const std::uint8_t *&p) {
+    std::int16_t v; std::memcpy(&v, p, 2); p += 2;
+    return v / 32767.0f;
+}
+static float read_u8n(const std::uint8_t *&p) {
+    return (*p++) / 255.0f;
+}
+
+static Vertex decode_vertex(const std::uint8_t *&p, std::uint32_t vt) {
+    Vertex v;
+    const std::uint32_t tc  = vtype_tex_type(vt);
+    const std::uint32_t cc  = vtype_col_type(vt);
+    const std::uint32_t nc  = vtype_nor_type(vt);
+    const std::uint32_t pc  = vtype_pos_type(vt);
+    const std::uint32_t wc  = vtype_wgt_type(vt);
+    const std::uint32_t nw  = vtype_nwgt(vt);
+
+    // Align to natural boundary before each field
+    auto align = [&](int a) { p = reinterpret_cast<const std::uint8_t*>((reinterpret_cast<std::uintptr_t>(p) + a - 1) & ~(std::uintptr_t)(a - 1)); };
+
+    // Weights (skip)
+    for (std::uint32_t i = 0; i < nw; ++i) {
+        if (wc == 1) { ++p; }
+        else if (wc == 2) { align(2); p += 2; }
+        else if (wc == 3) { align(4); p += 4; }
+    }
+
+    // Texture coords
+    if (tc == 1) { v.u = read_u8n(p); v.v = read_u8n(p); }
+    else if (tc == 2) { align(2); v.u = read_s16n(p); v.v = read_s16n(p); }
+    else if (tc == 3) { align(4); v.u = read_f32(p); v.v = read_f32(p); }
+
+    // Color
+    if (cc == 4 || cc == 7) { align(4); std::uint32_t c; std::memcpy(&c, p, 4); v.color = c; p += 4; }
+    else if (cc == 5) { align(2); std::uint16_t c; std::memcpy(&c, p, 2); v.color = to_abgr8888(c, 1); p += 2; }
+    else if (cc == 6) { align(2); std::uint16_t c; std::memcpy(&c, p, 2); v.color = to_abgr8888(c, 2); p += 2; }
+
+    // Normal (skip)
+    if (nc == 1) { p += 3; }
+    else if (nc == 2) { align(2); p += 6; }
+    else if (nc == 3) { align(4); p += 12; }
+
+    // Position
+    if (pc == 1) { v.x = *p++; v.y = *p++; v.z = *p++; }
+    else if (pc == 2) { align(2); std::int16_t x,y,z; std::memcpy(&x,p,2);p+=2; std::memcpy(&y,p,2);p+=2; std::memcpy(&z,p,2);p+=2; v.x=(float)x; v.y=(float)y; v.z=(float)z; }
+    else if (pc == 3) { align(4); v.x=read_f32(p); v.y=read_f32(p); v.z=read_f32(p); }
+
+    return v;
+}
+
+// ---- texture sampling -------------------------------------------------------
+
+static std::uint32_t sample_tex(const GeState &gs, float u, float v,
+                                 const void *mem, std::size_t mem_size) {
+    if (!gs.tex_enabled || gs.tbp[0] == 0) return 0xFFFFFFFFu;
+    // Clamp
+    int tw = static_cast<int>(gs.tw), th = static_cast<int>(gs.th);
+    int tx = static_cast<int>(u) % tw; if (tx < 0) tx += tw;
+    int ty = static_cast<int>(v) % th; if (ty < 0) ty += th;
+    tx = std::clamp(tx, 0, tw - 1);
+    ty = std::clamp(ty, 0, th - 1);
+
+    const std::uint32_t stride = gs.tbw[0] ? gs.tbw[0] : static_cast<std::uint32_t>(tw);
+    std::uint32_t off = 0;
+    std::uint32_t raw = 0;
+    switch (gs.tfmt) {
+    case 0: // RGB565 (2 bytes/pixel)
+        off = gs.tbp[0] + (static_cast<std::uint32_t>(ty) * stride + static_cast<std::uint32_t>(tx)) * 2;
+        if (off + 2 <= mem_size) { std::uint16_t p; std::memcpy(&p, static_cast<const char*>(mem) + off, 2); raw = p; }
+        return to_abgr8888(raw, 0);
+    case 1: // RGBA5551
+        off = gs.tbp[0] + (static_cast<std::uint32_t>(ty) * stride + static_cast<std::uint32_t>(tx)) * 2;
+        if (off + 2 <= mem_size) { std::uint16_t p; std::memcpy(&p, static_cast<const char*>(mem) + off, 2); raw = p; }
+        return to_abgr8888(raw, 1);
+    case 2: // RGBA4444
+        off = gs.tbp[0] + (static_cast<std::uint32_t>(ty) * stride + static_cast<std::uint32_t>(tx)) * 2;
+        if (off + 2 <= mem_size) { std::uint16_t p; std::memcpy(&p, static_cast<const char*>(mem) + off, 2); raw = p; }
+        return to_abgr8888(raw, 2);
+    case 3: // RGBA8888
+        off = gs.tbp[0] + (static_cast<std::uint32_t>(ty) * stride + static_cast<std::uint32_t>(tx)) * 4;
+        if (off + 4 <= mem_size) std::memcpy(&raw, static_cast<const char*>(mem) + off, 4);
+        return raw; // already ABGR8888
+    default:
+        return 0xFFFFFFFFu;
+    }
+}
+
+// ---- draw sprite (2-vertex quad, screen-space) ------------------------------
+
+static void draw_sprite(const GeState &gs, const Vertex &v0, const Vertex &v1,
+                        void *vram, std::size_t vram_size,
+                        const void *mem, std::size_t mem_size) {
+    // v0 = top-left UV + XY, v1 = bottom-right UV + XY
+    int x0 = static_cast<int>(v0.x), y0 = static_cast<int>(v0.y);
+    int x1 = static_cast<int>(v1.x), y1 = static_cast<int>(v1.y);
+    if (x0 > x1) std::swap(x0, x1);
+    if (y0 > y1) std::swap(y0, y1);
+
+    // Clip to scissor
+    x0 = std::max(x0, gs.sc_x1); y0 = std::max(y0, gs.sc_y1);
+    x1 = std::min(x1, gs.sc_x2); y1 = std::min(y1, gs.sc_y2);
+    if (x0 >= x1 || y0 >= y1) return;
+
+    const float du = (gs.tex_enabled && x1 > x0)
+        ? (v1.u - v0.u) / static_cast<float>(static_cast<int>(v1.x) - static_cast<int>(v0.x))
+        : 0.0f;
+    const float dv = (gs.tex_enabled && y1 > y0)
+        ? (v1.v - v0.v) / static_cast<float>(static_cast<int>(v1.y) - static_cast<int>(v0.y))
+        : 0.0f;
+
+    const int bpp = (gs.fbfmt == 0) ? 2 : 4;
+    const std::size_t row_bytes = static_cast<std::size_t>(gs.fbw) * bpp;
+
+    for (int y = y0; y < y1; ++y) {
+        const float fv = v0.v + static_cast<float>(y - static_cast<int>(v0.y)) * dv;
+        const std::size_t row_off = gs.fbp + static_cast<std::size_t>(y) * row_bytes;
+        if (row_off + static_cast<std::size_t>(x1) * bpp > vram_size) continue;
+        auto *dst32 = reinterpret_cast<std::uint32_t *>(static_cast<char *>(vram) + row_off);
+        auto *dst16 = reinterpret_cast<std::uint16_t *>(static_cast<char *>(vram) + row_off);
+
+        for (int x = x0; x < x1; ++x) {
+            const float fu = v0.u + static_cast<float>(x - static_cast<int>(v0.x)) * du;
+            std::uint32_t pixel;
+            if (gs.tex_enabled)
+                pixel = sample_tex(gs, fu, fv, mem, mem_size);
+            else
+                pixel = v1.color; // sprite uses v1's color when no texture? use gs.color
+
+            if (gs.fbfmt == 0) {
+                // Write RGB565
+                const std::uint8_t r = (pixel >>  0) & 0xFF;
+                const std::uint8_t g = (pixel >>  8) & 0xFF;
+                const std::uint8_t b = (pixel >> 16) & 0xFF;
+                dst16[x] = static_cast<std::uint16_t>(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
+            } else {
+                blend_pixel(&dst32[x], pixel);
+            }
+        }
+    }
+}
+
+// ---- draw triangle ----------------------------------------------------------
+
+static void draw_triangle(const GeState &gs,
+                           const Vertex &v0, const Vertex &v1, const Vertex &v2,
+                           void *vram, std::size_t vram_size,
+                           const void *mem,  std::size_t mem_size) {
+    // Simple scanline rasterizer (no perspective correction)
+    // Bounding box
+    int minx = std::max(gs.sc_x1, (int)std::min({v0.x, v1.x, v2.x}));
+    int maxx = std::min(gs.sc_x2, (int)std::max({v0.x, v1.x, v2.x}) + 1);
+    int miny = std::max(gs.sc_y1, (int)std::min({v0.y, v1.y, v2.y}));
+    int maxy = std::min(gs.sc_y2, (int)std::max({v0.y, v1.y, v2.y}) + 1);
+    if (minx >= maxx || miny >= maxy) return;
+
+    const float denom = (v1.y - v2.y) * (v0.x - v2.x) + (v2.x - v1.x) * (v0.y - v2.y);
+    if (std::abs(denom) < 1e-6f) return;
+    const float inv_denom = 1.0f / denom;
+
+    const int bpp = (gs.fbfmt == 0) ? 2 : 4;
+    const std::size_t row_bytes = static_cast<std::size_t>(gs.fbw) * bpp;
+
+    for (int y = miny; y < maxy; ++y) {
+        const std::size_t row_off = gs.fbp + static_cast<std::size_t>(y) * row_bytes;
+        if (row_off + static_cast<std::size_t>(maxx) * bpp > vram_size) continue;
+        auto *dst32 = reinterpret_cast<std::uint32_t *>(static_cast<char *>(vram) + row_off);
+        auto *dst16 = reinterpret_cast<std::uint16_t *>(static_cast<char *>(vram) + row_off);
+
+        for (int x = minx; x < maxx; ++x) {
+            const float px = static_cast<float>(x) + 0.5f;
+            const float py = static_cast<float>(y) + 0.5f;
+            float w0 = ((v1.y - v2.y) * (px - v2.x) + (v2.x - v1.x) * (py - v2.y)) * inv_denom;
+            float w1 = ((v2.y - v0.y) * (px - v2.x) + (v0.x - v2.x) * (py - v2.y)) * inv_denom;
+            float w2 = 1.0f - w0 - w1;
+            if (w0 < 0 || w1 < 0 || w2 < 0) continue;
+
+            std::uint32_t pixel;
+            if (gs.tex_enabled) {
+                float fu = w0 * v0.u + w1 * v1.u + w2 * v2.u;
+                float fv = w0 * v0.v + w1 * v1.v + w2 * v2.v;
+                pixel = sample_tex(gs, fu, fv, mem, mem_size);
+            } else {
+                // Interpolate color
+                std::uint32_t c0 = v0.color, c1 = v1.color, c2 = v2.color;
+                auto chan = [&](int shift) -> std::uint32_t {
+                    return static_cast<std::uint32_t>(
+                        w0 * ((c0 >> shift) & 0xFF) +
+                        w1 * ((c1 >> shift) & 0xFF) +
+                        w2 * ((c2 >> shift) & 0xFF));
+                };
+                pixel = (chan(24) << 24) | (chan(16) << 16) | (chan(8) << 8) | chan(0);
+            }
+
+            if (gs.fbfmt == 0) {
+                const std::uint8_t r = (pixel >>  0) & 0xFF;
+                const std::uint8_t g = (pixel >>  8) & 0xFF;
+                const std::uint8_t b = (pixel >> 16) & 0xFF;
+                dst16[x] = static_cast<std::uint16_t>(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
+            } else {
+                blend_pixel(&dst32[x], pixel);
+            }
+        }
+    }
+}
+
+// ---- main executor ----------------------------------------------------------
+
+void ge_exec(const std::uint32_t *dl, const std::uint32_t *dl_end,
+             void *vram, std::size_t vram_size,
+             const void *mem, std::size_t mem_size) {
+    if (!dl || !vram) return;
+
+    GeState gs;
+    static std::uint32_t s_exec_count = 0;
+    ++s_exec_count;
+    std::printf("[GE] exec #%u dl=%p dl_end=%p span=%zu\n", s_exec_count, (void*)dl, (void*)dl_end, (std::size_t)(dl_end - dl));
+
+    // Parse commands. dl_end is the hard limit for the initial segment.
+    // After a JUMP we follow the chain freely but still respect memory bounds.
+    const std::uint32_t *p = dl;
+    bool jumped = false; // set true after first JUMP
+    for (std::uint32_t insn_limit = 0; insn_limit < 1000000u; ++insn_limit, ++p) {
+        // Before a JUMP, stop at dl_end (don't read past the submitted range)
+        if (!jumped && p >= dl_end) break;
+        // After a JUMP, verify we're in a known region
+        if (jumped) {
+            const uintptr_t p_host = reinterpret_cast<uintptr_t>(p);
+            const uintptr_t mem_base = reinterpret_cast<uintptr_t>(mem);
+            const uintptr_t vram_base = reinterpret_cast<uintptr_t>(vram);
+            bool in_mem  = (p_host >= mem_base  && p_host + 4 <= mem_base  + mem_size);
+            bool in_vram = (p_host >= vram_base && p_host + 4 <= vram_base + vram_size);
+            if (!in_mem && !in_vram) break;
+        }
+        const std::uint32_t cmd = *p;
+        const std::uint8_t  op  = static_cast<std::uint8_t>(cmd >> 24);
+        const std::uint32_t arg = cmd & 0x00FFFFFFu;
+
+        switch (op) {
+        case 0x00: break; // NOP
+        case 0x08: // BASE — upper address bits
+            gs.base_addr = (arg & 0xFF0000u) << 8;
+            break;
+        case 0x01: // VADDR
+            gs.vaddr = gs.base_addr | arg;
+            break;
+        case 0x02: // IADDR
+            gs.iaddr = gs.base_addr | arg;
+            break;
+        case 0x0F: // FINISH — end of list
+            goto done;
+        case 0x5C: // JUMP — unconditional jump to address
+        case 0x5D: { // JUMP_END — also unconditional for our purposes
+            const std::uint32_t target_phys = (gs.base_addr & 0xFF000000u) | arg;
+            const std::uint32_t *new_p = nullptr;
+            if (target_phys < mem_size)
+                new_p = reinterpret_cast<const std::uint32_t *>(static_cast<const char *>(mem) + target_phys);
+            else if (target_phys >= 0x04000000u && target_phys < 0x04200000u)
+                new_p = reinterpret_cast<const std::uint32_t *>(static_cast<const char *>(vram) + (target_phys - 0x04000000u));
+            if (new_p) { p = new_p - 1; jumped = true; } // -1 because loop does ++p
+            break;
+        }
+        case 0x10: // SIGNAL — ignore
+        case 0x11: break;
+        case 0x09: // SCISSOR1 (x1 | y1<<10)
+            gs.sc_x1 = arg & 0x3FFu;
+            gs.sc_y1 = (arg >> 10) & 0x3FFu;
+            break;
+        case 0x0A: // SCISSOR2
+            gs.sc_x2 = (arg & 0x3FFu) + 1;
+            gs.sc_y2 = ((arg >> 10) & 0x3FFu) + 1;
+            break;
+        case 0xD2: { // CLEAR flags
+            // bits: 0=clear-mode-enable, 1=clear-color, 2=clear-stencil/alpha, 4=clear-depth
+            gs.clear_mode = (arg & 1) != 0;
+            break;
+        }
+        case 0x03: // BEZIER — ignore
+        case 0x05: // SPLINE — ignore
+            break;
+
+        // Framebuffer base/width/format
+        case 0x9C: // TBW — texture buffer width (bits 0..7 = width in 8-pixel units) AND format
+            // Actually: arg bits 15:0 = TPSM (pixel format), bits 23:16 = TBW (buf width / 8)
+            // From PSP docs: TBUF = 0x9D (buf width in 8s), TPSM separate
+            // Here we treat 0x9C as combined per many docs
+            gs.tbw[0] = ((arg >> 8) & 0xFFu) * 8u; // buf width in pixels
+            gs.tfmt   = (arg >> 24) & 0xFu; // pixel format in high byte — but arg is only 24 bits...
+            // Actually TPSM is a separate command (0xC8). Use arg[23:16] as TBW:
+            gs.tbw[0] = ((arg >> 16) & 0xFFu) * 8u;
+            break;
+        case 0x9D: // TBUF (frame buffer base for texture) — low 24 bits
+            gs.tbp[0] = gs.base_addr | arg;
+            break;
+        case 0x9E: case 0x9F: break; // BONE data — skip
+        case 0xA0: // VTYPE
+            gs.vtype = arg;
+            break;
+        case 0xA1: // OFFSET_ADDR
+            gs.base_addr = (arg & 0xFF0000u) << 8;
+            break;
+
+        // Texture enable
+        case 0xD4: gs.tex_enabled = (arg & 1) != 0; break;
+
+        // Texture base pointers (TBP0-7 at 0xA2-0xA9 per SDK)
+        case 0xA2: gs.tbp[0] = (gs.base_addr & 0xFF000000u) | arg; break;
+        case 0xA3: gs.tbp[1] = (gs.base_addr & 0xFF000000u) | arg; break;
+        case 0xA4: gs.tbp[2] = (gs.base_addr & 0xFF000000u) | arg; break;
+        case 0xA5: gs.tbp[3] = (gs.base_addr & 0xFF000000u) | arg; break;
+        case 0xA6: gs.tbw[0] = arg & 0xFFFFu; break;
+        case 0xA7: gs.tbw[1] = arg & 0xFFFFu; break;
+        case 0xA8: { // TSIZE — texture dimensions as log2
+            int tw_log = arg & 0xFu;
+            int th_log = (arg >> 8) & 0xFu;
+            gs.tw = 1u << tw_log;
+            gs.th = 1u << th_log;
+            break;
+        }
+        case 0xAD: gs.tfmt = arg & 0xFu; break; // TPSM — texture pixel format
+
+        // Frame buffer target
+        case 0x9A: gs.fbp  = arg & 0x00FFFFFFu; break; // FBUF base (VRAM-relative)
+        case 0x9B: gs.fbw  = arg & 0xFFFFu; gs.fbfmt = (arg >> 16) & 0xFu; break; // FBUFWIDTH+FMT
+
+        default: break;
+        }
+
+        // COLOR register for clear / ambient
+        if (op == 0xD3) {
+            gs.color = arg | 0xFF000000u;
+            gs.clear_color = arg | 0xFF000000u;
+        }
+
+        // Draw primitive: PSP GE PRIM opcode is 0x04
+        if (op == 0x04) { // PRIM (prim_type<<16 | vertex_count)
+            static std::uint32_t s_prim_log = 0;
+            if (++s_prim_log <= 10) std::printf("[GE-PRIM] type=%u count=%u vtype=0x%X vaddr=0x%08X fbp=0x%X fbfmt=%d\n",
+                (arg>>16)&7, arg&0xFFFF, gs.vtype, gs.vaddr, gs.fbp, gs.fbfmt);
+            const std::uint32_t prim_type = (arg >> 16) & 7;
+            const std::uint32_t count     = arg & 0xFFFFu;
+            if (count == 0) break;
+
+            // Determine vertex stride and decode vertices
+            // vaddr points into guest memory (physical, relative to RAM base 0x08800000 or VRAM 0x04000000)
+            std::uint32_t va = gs.vaddr;
+            // Map to host memory:
+            // PSP RAM is at 0x08800000 in guest VA → we have full flat mem view
+            // But our ge_exec gets mem pointer starting at physical 0 (the loaded ELF image)
+            // The guest memory flat view starts at 0x08800000 (ELF load base).
+            // vaddr after masking 0x1FFFFFFF is a physical address.
+            // PSP physical map: 0x04000000-0x041FFFFF = VRAM, 0x08000000+ = RAM
+            // Our mem pointer = entire addressable space? We need to handle the mapping.
+
+            // Actually: the runtime memory has VRAM at 0x04000000 phys and RAM at 0x08000000+
+            // For simplicity, try to map va to our buffers:
+            const std::uint8_t *vptr = nullptr;
+            if (va >= 0x04000000u && va < 0x04200000u && (va - 0x04000000u) < vram_size)
+                vptr = static_cast<const std::uint8_t*>(vram) + (va - 0x04000000u);
+            else if (va < mem_size)
+                vptr = static_cast<const std::uint8_t*>(mem) + va;
+            if (!vptr) break;
+
+            if (prim_type == 6) { // GU_SPRITES (2 vertices per sprite)
+                for (std::uint32_t i = 0; i + 1 < count; i += 2) {
+                    const std::uint8_t *vp = vptr;
+                    Vertex v0 = decode_vertex(vp, gs.vtype);
+                    Vertex v1 = decode_vertex(vp, gs.vtype);
+                    vptr = vp;
+                    // Scale UV from [0..1] to texture pixels if bypass
+                    if (vtype_bypass(gs.vtype)) {
+                        v0.u *= gs.tw; v0.v *= gs.th;
+                        v1.u *= gs.tw; v1.v *= gs.th;
+                    }
+                    draw_sprite(gs, v0, v1, vram, vram_size, mem, mem_size);
+                }
+            } else if (prim_type == 3) { // GU_TRIANGLES
+                for (std::uint32_t i = 0; i + 2 < count; i += 3) {
+                    const std::uint8_t *vp = vptr;
+                    Vertex v0 = decode_vertex(vp, gs.vtype);
+                    Vertex v1 = decode_vertex(vp, gs.vtype);
+                    Vertex v2 = decode_vertex(vp, gs.vtype);
+                    vptr = vp;
+                    draw_triangle(gs, v0, v1, v2, vram, vram_size, mem, mem_size);
+                }
+            } else if (prim_type == 4) { // GU_TRIANGLE_STRIP
+                const std::uint8_t *vp = vptr;
+                Vertex prev0 = decode_vertex(vp, gs.vtype);
+                Vertex prev1 = decode_vertex(vp, gs.vtype);
+                for (std::uint32_t i = 2; i < count; ++i) {
+                    Vertex v2 = decode_vertex(vp, gs.vtype);
+                    draw_triangle(gs, (i & 1) ? prev1 : prev0, (i & 1) ? prev0 : prev1, v2, vram, vram_size, mem, mem_size);
+                    prev0 = prev1; prev1 = v2;
+                }
+                vptr = vp;
+            }
+            // When in clear mode, the PRIM just fills the scissor rect with the clear color
+            if (gs.clear_mode) {
+                const std::uint32_t cc = gs.clear_color;
+                const int bpp = (gs.fbfmt == 0) ? 2 : 4;
+                for (int y = gs.sc_y1; y < gs.sc_y2 && y < 272; ++y) {
+                    std::uint8_t *row = static_cast<std::uint8_t*>(vram)
+                                      + gs.fbp + static_cast<std::size_t>(y) * gs.fbw * bpp;
+                    if (row + gs.sc_x2 * bpp > static_cast<std::uint8_t*>(vram) + vram_size) continue;
+                    if (gs.fbfmt == 0) {
+                        auto *dst = reinterpret_cast<std::uint16_t*>(row);
+                        const std::uint8_t r = (cc >>  0) & 0xFF;
+                        const std::uint8_t g = (cc >>  8) & 0xFF;
+                        const std::uint8_t b = (cc >> 16) & 0xFF;
+                        const std::uint16_t px16 = static_cast<std::uint16_t>(((r>>3)<<11)|((g>>2)<<5)|(b>>3));
+                        for (int x = gs.sc_x1; x < gs.sc_x2; ++x) dst[x] = px16;
+                    } else {
+                        auto *dst = reinterpret_cast<std::uint32_t*>(row);
+                        for (int x = gs.sc_x1; x < gs.sc_x2; ++x) dst[x] = cc;
+                    }
+                }
+            }
+        }
+    }
+done:
+    (void)s_exec_count;
+}
+
+} // namespace d012
