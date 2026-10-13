@@ -53286,8 +53286,22 @@ L_088631E4:
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_08863208: // FUN_08863208 stub: UMD/DVD init - return 0 (no disc on PC)
-    { static bool once=false; if(!once){once=true; std::printf("[HLE] FUN_08863208 UMD init skipped\n");} }
+L_08863208: // FUN_08863208 UMD manager init: fire the UMD-ready callback to open the rendering gate
+    { static bool once=false;
+      if(!once){ once=true;
+          std::printf("[UMD] FUN_08863208: firing UMD callback FUN_08883998 to open rendering gate\n");
+          const std::uint32_t saved_ra = ctx.gpr[31];
+          const std::uint32_t saved_sp = ctx.gpr[29];
+          ctx.gpr[4]  = 0u;
+          ctx.gpr[5]  = 0x00090000u; // UMD_PRESENT|UMD_READY event bits in high word
+          ctx.gpr[29] = saved_sp - 64u;
+          ctx.gpr[31] = 0x00000001u; // sentinel RA
+          rt.run(0x08883998u, 20'000'000u);
+          ctx.gpr[31] = saved_ra;
+          ctx.gpr[29] = saved_sp;
+          std::printf("[UMD] FUN_08863208: callback returned\n");
+      }
+    }
     ctx.gpr[2] = 0u;
     jump_target = ctx.gpr[31];
     ctx.pc = jump_target;
