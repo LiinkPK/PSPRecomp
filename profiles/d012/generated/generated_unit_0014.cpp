@@ -4592,30 +4592,6 @@ L_089C5BB8:
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
 L_089C5BC0: // sceUmdGetDriveStat() -> PSP_UMD_PRESENT(0x20) | PSP_UMD_READY(0x40) | PSP_UMD_READABLE(0x01)
-    { // On first call, fire the UMD status callback (FUN_08883998) with PRESENT|READY bits
-      // so FUN_08883340->FUN_088839F8->FUN_08882E80 runs and opens the rendering gate (DAT_089D69DC=1).
-      // FUN_08883998 checks gpr[5] & 0x00090000; bit 16 (0x10000) = UMD_PRESENT event.
-      static bool s_umd_callback_fired = false;
-      if (!s_umd_callback_fired) {
-          s_umd_callback_fired = true;
-          std::printf("[UMD] Firing UMD ready callback (FUN_08883998) to open rendering gate\n");
-          const std::uint32_t saved_ra  = ctx.gpr[31];
-          const std::uint32_t saved_sp  = ctx.gpr[29];
-          const std::uint32_t saved_a0  = ctx.gpr[4];
-          const std::uint32_t saved_a1  = ctx.gpr[5];
-          ctx.gpr[4]  = 0u;               // arg0: callback notifyID (unused by FUN_08883998)
-          ctx.gpr[5]  = 0x00090000u;      // arg1: UMD status flags — bits 16+19 = PRESENT|READY events
-          ctx.gpr[29] = saved_sp - 64u;   // fresh stack frame
-          ctx.gpr[31] = 0x00000001u;      // sentinel RA
-          rt.run(0x08883998u, 10'000'000u);
-          ctx.gpr[31] = saved_ra;
-          ctx.gpr[29] = saved_sp;
-          ctx.gpr[4]  = saved_a0;
-          ctx.gpr[5]  = saved_a1;
-          // Reload local_pc after the nested run
-          local_pc = ctx.pc;
-      }
-    }
     ctx.gpr[2] = 0x61u; // PSP_UMD_PRESENT|PSP_UMD_READY|PSP_UMD_READABLE (disc always present)
     jump_target = ctx.gpr[31];
     ctx.pc = jump_target;

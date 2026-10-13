@@ -53286,20 +53286,21 @@ L_088631E4:
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_08863208: // FUN_08863208 UMD manager init: fire the UMD-ready callback to open the rendering gate
+L_08863208: // FUN_08863208 UMD manager init: open rendering gate directly (simulates UMD ready callback)
     { static bool once=false;
       if(!once){ once=true;
-          std::printf("[UMD] FUN_08863208: firing UMD callback FUN_08883998 to open rendering gate\n");
-          const std::uint32_t saved_ra = ctx.gpr[31];
-          const std::uint32_t saved_sp = ctx.gpr[29];
-          ctx.gpr[4]  = 0u;
-          ctx.gpr[5]  = 0x00090000u; // UMD_PRESENT|UMD_READY event bits in high word
-          ctx.gpr[29] = saved_sp - 64u;
-          ctx.gpr[31] = 0x00000001u; // sentinel RA
-          rt.run(0x08883998u, 20'000'000u);
-          ctx.gpr[31] = saved_ra;
-          ctx.gpr[29] = saved_sp;
-          std::printf("[UMD] FUN_08863208: callback returned\n");
+          // DAT_089D69DC is the rendering gate. On a real PSP the UMD callback chain
+          // (FUN_08883998 -> FUN_08883340 -> FUN_088839F8 -> FUN_08882E80 -> sceKernelVolatileMemLock)
+          // sets it to 1 when the disc is ready. We skip all that and set it directly.
+          const std::uint32_t gate_va = 0x089D69DCu;
+          if (rt.memory().contains(gate_va, 1u)) {
+              const std::uint32_t word = rt.memory().load32(gate_va & ~3u);
+              // gate is at byte offset 0 within the word (address ends in C, so low byte of word at 0x089D69DC)
+              const int shift = (gate_va & 3u) * 8;
+              const std::uint32_t new_word = (word & ~(0xFFu << shift)) | (1u << shift);
+              rt.memory().store32(gate_va & ~3u, new_word);
+              std::printf("[UMD] FUN_08863208: rendering gate opened (DAT_089D69DC=1)\n");
+          }
       }
     }
     ctx.gpr[2] = 0u;
