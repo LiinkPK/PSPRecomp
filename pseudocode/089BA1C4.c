@@ -1,0 +1,9 @@
+/* Entry 0x089BA1C4 | file offset 0x001B719C | FUN_089ba1c4 | bytes 20 */
+
+void FUN_089ba1c4(undefined4 param_1,undefined4 *param_2)
+
+{
+  FUN_089ba0c4(*param_2,param_2[1],param_2[2],param_2[3]);
+  return;
+}
+

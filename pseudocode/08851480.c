@@ -1,0 +1,264 @@
+/* Entry 0x08851480 | file offset 0x0004E458 | FUN_08851480 | bytes 1268 */
+
+void FUN_08851480(undefined4 *param_1,undefined4 *param_2)
+
+{
+  undefined4 uVar1;
+  undefined4 uVar2;
+  undefined4 uVar3;
+  int iVar4;
+  undefined1 auStack_290 [48];
+  float local_260;
+  float local_25c;
+  float local_258;
+  undefined4 local_250;
+  undefined4 local_24c;
+  undefined4 local_248;
+  undefined4 local_244;
+  undefined4 local_240;
+  undefined4 local_23c;
+  undefined4 local_238;
+  undefined4 local_234;
+  undefined4 local_230;
+  undefined4 local_22c;
+  undefined4 local_228;
+  undefined4 local_224;
+  undefined4 local_220;
+  undefined4 local_21c;
+  undefined4 local_218;
+  undefined4 local_214;
+  undefined4 local_210;
+  undefined4 local_20c;
+  undefined4 local_208;
+  undefined4 local_204;
+  undefined4 local_200;
+  undefined4 local_1fc;
+  undefined4 local_1f8;
+  undefined4 local_1f4;
+  undefined4 local_1f0;
+  undefined4 local_1ec;
+  undefined4 local_1e8;
+  undefined4 local_1e4;
+  undefined4 local_1e0;
+  undefined4 local_1dc;
+  undefined4 local_1d8;
+  undefined4 local_1d4;
+  undefined4 local_1d0;
+  undefined4 local_1cc;
+  undefined4 local_1c8;
+  undefined4 local_1c4;
+  undefined4 local_1c0;
+  undefined4 local_1bc;
+  undefined4 local_1b8;
+  undefined4 local_1b4;
+  undefined4 local_1b0;
+  undefined4 local_1ac;
+  undefined4 local_1a8;
+  undefined4 local_1a4;
+  undefined4 local_1a0;
+  undefined4 local_19c;
+  undefined4 local_198;
+  undefined4 local_194;
+  undefined4 local_190;
+  undefined4 local_18c;
+  undefined4 local_188;
+  undefined4 local_184;
+  undefined4 local_180;
+  undefined4 local_17c;
+  undefined4 local_178;
+  undefined4 local_174;
+  undefined4 local_170;
+  undefined4 local_16c;
+  undefined4 local_168;
+  undefined4 local_164;
+  undefined4 local_160;
+  undefined4 local_15c;
+  undefined4 local_158;
+  undefined4 local_154;
+  undefined4 local_150;
+  undefined4 local_14c;
+  undefined4 local_148;
+  undefined1 auStack_144 [12];
+  undefined4 local_138;
+  float local_134;
+  float local_130;
+  float local_12c;
+  undefined4 local_128;
+  undefined4 local_124;
+  undefined4 local_120;
+  undefined4 local_110;
+  undefined4 local_10c;
+  undefined4 local_108;
+  float local_100;
+  float local_fc;
+  float local_f8;
+  undefined1 auStack_f0 [48];
+  undefined4 local_c0;
+  undefined4 local_bc;
+  undefined4 local_b8;
+  undefined4 local_b0;
+  undefined4 local_ac;
+  undefined4 local_a8;
+  undefined4 local_a4;
+  undefined4 local_a0;
+  undefined4 local_9c;
+  undefined4 local_98;
+  undefined4 local_94;
+  undefined4 local_90;
+  undefined4 local_8c;
+  undefined4 local_88;
+  undefined4 local_84;
+  undefined4 local_80;
+  undefined4 local_7c;
+  undefined4 local_78;
+  undefined4 local_74;
+  
+  iVar4 = param_2[0x175];
+  if (*(char *)((int)param_2 + 0x612) == '\0') {
+    if (*(char *)((int)param_2 + 0x613) == '\0') {
+      FUN_08836648(&local_1d0,iVar4,(int)*(short *)((int)param_2 + 0x60a));
+      local_210 = local_1d0;
+      local_20c = local_1cc;
+      local_208 = local_1c8;
+      local_204 = local_1c4;
+      local_200 = local_1c0;
+      local_1fc = local_1bc;
+      local_1f8 = local_1b8;
+      local_1f4 = local_1b4;
+      local_1f0 = local_1b0;
+      local_1ec = local_1ac;
+      local_1e8 = local_1a8;
+      local_1e4 = local_1a4;
+      local_1e0 = local_1a0;
+      local_1dc = local_19c;
+      local_1d8 = local_198;
+      local_1d4 = local_194;
+      FUN_089a3efc(auStack_290,&local_210);
+    }
+    else {
+      iVar4 = FUN_0884f6f4(iVar4 + 0xd64,(int)*(short *)(param_2 + 0x183));
+      if (iVar4 == 0) {
+        uVar2 = param_2[1];
+        uVar3 = param_2[2];
+        *param_1 = *param_2;
+        uVar1 = param_2[3];
+        param_1[1] = uVar2;
+        uVar2 = param_2[4];
+        param_1[2] = uVar3;
+        uVar3 = param_2[5];
+        param_1[3] = uVar1;
+        uVar1 = param_2[6];
+        param_1[4] = uVar2;
+        uVar2 = param_2[7];
+        param_1[5] = uVar3;
+        uVar3 = param_2[8];
+        param_1[6] = uVar1;
+        uVar1 = param_2[9];
+        param_1[7] = uVar2;
+        uVar2 = param_2[10];
+        param_1[8] = uVar3;
+        uVar3 = param_2[0xb];
+        param_1[9] = uVar1;
+        uVar1 = param_2[0xc];
+        param_1[10] = uVar2;
+        uVar2 = param_2[0xd];
+        param_1[0xb] = uVar3;
+        uVar3 = param_2[0xe];
+        param_1[0xc] = uVar1;
+        uVar1 = param_2[0xf];
+        param_1[0xd] = uVar2;
+        param_1[0xe] = uVar3;
+        param_1[0xf] = uVar1;
+        return;
+      }
+      FUN_089a3efc(auStack_290,iVar4);
+    }
+  }
+  else {
+    iVar4 = (**(code **)(*(int *)(iVar4 + 0x544) + 0x124))
+                      (iVar4 + *(short *)(*(int *)(iVar4 + 0x544) + 0x120));
+    if (iVar4 == 0) {
+      iVar4 = *(int *)(param_2[0x175] + 0x544);
+      iVar4 = (**(code **)(iVar4 + 0x134))(param_2[0x175] + (int)*(short *)(iVar4 + 0x130));
+    }
+    FUN_089a3efc(auStack_290,iVar4);
+  }
+  FUN_089a3fb8(&local_b0,auStack_290,param_2 + 0x154);
+  local_190 = local_b0;
+  local_18c = local_ac;
+  local_188 = local_a8;
+  local_184 = local_a4;
+  local_180 = local_a0;
+  local_17c = local_9c;
+  local_178 = local_98;
+  local_174 = local_94;
+  local_170 = local_90;
+  local_16c = local_8c;
+  local_168 = local_88;
+  local_164 = local_84;
+  local_160 = local_80;
+  local_15c = local_7c;
+  local_158 = local_78;
+  local_154 = local_74;
+  local_250 = local_b0;
+  local_24c = local_ac;
+  local_248 = local_a8;
+  local_244 = local_a4;
+  local_240 = local_a0;
+  local_23c = local_9c;
+  local_238 = local_98;
+  local_234 = local_94;
+  local_230 = local_90;
+  local_22c = local_8c;
+  local_228 = local_88;
+  local_224 = local_84;
+  local_220 = local_80;
+  local_21c = local_7c;
+  local_218 = local_78;
+  local_214 = local_74;
+  if (param_2[0xe8] != 0) {
+    uVar1 = FUN_08899300();
+    FUN_089a38e0(&local_110,&local_220,&local_260);
+    FUN_089a3bf8(&local_110);
+    iVar4 = param_2[0xe8];
+    local_100 = *(float *)(iVar4 + 8);
+    local_fc = *(float *)(iVar4 + 0xc) + *(float *)(iVar4 + 0x14);
+    local_134 = local_260 + local_100;
+    local_f8 = *(float *)(iVar4 + 0x10);
+    local_130 = local_25c + local_fc;
+    local_12c = local_258 + local_f8;
+    FUN_089a34c0(auStack_144,&local_134);
+    local_138 = *(undefined4 *)(param_2[0xe8] + 0x18);
+    local_c0 = local_110;
+    local_bc = local_10c;
+    local_b8 = local_108;
+    local_150 = local_110;
+    local_14c = local_10c;
+    local_148 = local_108;
+    iVar4 = FUN_0889cf04(uVar1,auStack_f0,auStack_144,&local_150,&local_128,0x36,1,0,0);
+    if (iVar4 == 1) {
+      local_220 = local_128;
+      local_21c = local_124;
+      local_218 = local_120;
+      local_214 = 0x3f800000;
+    }
+  }
+  *param_1 = local_250;
+  param_1[1] = local_24c;
+  param_1[2] = local_248;
+  param_1[3] = local_244;
+  param_1[4] = local_240;
+  param_1[5] = local_23c;
+  param_1[6] = local_238;
+  param_1[7] = local_234;
+  param_1[8] = local_230;
+  param_1[9] = local_22c;
+  param_1[10] = local_228;
+  param_1[0xb] = local_224;
+  param_1[0xc] = local_220;
+  param_1[0xd] = local_21c;
+  param_1[0xe] = local_218;
+  param_1[0xf] = local_214;
+  return;
+}
+

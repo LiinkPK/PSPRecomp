@@ -1,0 +1,11 @@
+/* Entry 0x0891714C | file offset 0x00114124 | FUN_0891714c | bytes 116 */
+
+void FUN_0891714c(void)
+
+{
+  FUN_0891813c(DAT_089d83d8);
+  FUN_08865088(DAT_089d83d8 + 4,3,1000,FUN_08917210,"MainTask");
+  FUN_08865088(DAT_089d83d8 + 4,3,110000,FUN_08917230,"DrawTask");
+  return;
+}
+

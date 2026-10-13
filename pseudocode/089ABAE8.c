@@ -1,0 +1,28 @@
+/* Entry 0x089ABAE8 | file offset 0x001A8AC0 | FUN_089abae8 | bytes 212 */
+
+int FUN_089abae8(int param_1,int param_2,undefined4 param_3,int param_4,int param_5,code *param_6)
+
+{
+  int iVar1;
+  int iVar2;
+  int iVar3;
+  
+  iVar1 = FUN_089aba0c();
+  if ((iVar1 != 0) && (param_6 != (code *)0x0)) {
+    if (0 < param_5) {
+      iVar3 = 0;
+      iVar2 = iVar1;
+      do {
+        iVar3 = iVar3 + 1;
+        (*param_6)(iVar2);
+        iVar2 = iVar2 + param_4;
+      } while (param_5 != iVar3);
+    }
+    if (1 < param_5) {
+      iVar2 = *(int *)(param_2 * 4 + param_1);
+      *(short *)(iVar2 + 0xe) = (short)param_5 + *(short *)(iVar2 + 0xe) + -1;
+    }
+  }
+  return iVar1;
+}
+

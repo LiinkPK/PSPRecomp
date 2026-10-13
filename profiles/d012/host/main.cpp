@@ -2,9 +2,11 @@
 #include "psprecomp/elf32.hpp"
 #include "psprecomp/guest_memory.hpp"
 #include "d012_profile.hpp"
+#include "win32_display.hpp"
 #include <cstdio>
 #include <cstdlib>
 #include <stdexcept>
+#include <filesystem>
 
 namespace psprecomp {
 void register_generated_functions(Runtime &runtime);
@@ -23,8 +25,20 @@ int main(int argc, char *argv[]) {
         elf.load_and_relocate(runtime.memory());
         std::printf("ELF mapped to guest memory\n");
 
+        // Set game root to directory containing the BIN so file I/O can find assets
+        {
+            std::filesystem::path bin_path(eboot);
+            auto dir = bin_path.parent_path();
+            if (!dir.empty()) {
+                runtime.set_game_root(dir);
+                d012::g_game_root = dir.string();
+            }
+        }
+
         // Scan for embedded syscall stubs BEFORE generated functions so
         // has_function() correctly skips anything already registered.
+        d012::display_init(480, 272);
+
         d012::scan_and_register_stubs(runtime, elf);
 
         std::printf("Starting AOT registration...\n");

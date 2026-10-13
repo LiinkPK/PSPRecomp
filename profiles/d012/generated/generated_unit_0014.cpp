@@ -1,15 +1,22 @@
 #include "psprecomp/runtime.hpp"
 #include "generated_units.hpp"
 #include "d012_profile.hpp"
+#include "win32_display.hpp"
 #include <bit>
+#include <chrono>
 #include <cstdio>
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <string>
+#include <vector>
 
 namespace psprecomp {
 void recomp_unit_0014_entry(Runtime &rt, AllegrexContext &ctx, std::uint16_t direct_entry_id, GuestMemory::AotFastView &aot_mem) {
     (void)direct_entry_id;
+    { static std::uint32_t s_u14 = 0u; ++s_u14;
+      if (s_u14 <= 5u) { std::printf("[U14] entry pc=0x%08X\n", ctx.pc); std::fflush(stdout); }
+    }
     std::uint32_t jump_target = 0u;
     std::uint32_t local_transfers = 0u;
     std::uint32_t local_pc = 0u;
@@ -1634,6 +1641,27 @@ LOCAL_DISPATCH:
     case 0x089D18CCu: goto L_089D18CC;
     case 0x089D18E0u: goto L_089D18E0;
     case 0x089D18F4u: goto L_089D18F4;
+    case 0x089D18F8u: goto L_089D18F8;
+    case 0x089D18FCu: goto L_089D18FC;
+    case 0x089D1900u: goto L_089D1900;
+    case 0x089D1904u: goto L_089D1904;
+    case 0x089D1908u: goto L_089D1908;
+    case 0x089D190Cu: goto L_089D190C;
+    case 0x089D1910u: goto L_089D1910;
+    case 0x089D1914u: goto L_089D1914;
+    case 0x089D1918u: goto L_089D1918;
+    case 0x089D191Cu: goto L_089D191C;
+    case 0x089D1920u: goto L_089D1920;
+    case 0x089D1924u: goto L_089D1924;
+    case 0x089D1928u: goto L_089D1928;
+    case 0x089D192Cu: goto L_089D192C;
+    case 0x089D1930u: goto L_089D1930;
+    case 0x089D1934u: goto L_089D1934;
+    case 0x089D1938u: goto L_089D1938;
+    case 0x089D193Cu: goto L_089D193C;
+    case 0x089D1940u: goto L_089D1940;
+    case 0x089D1944u: goto L_089D1944;
+    case 0x089D1948u: goto L_089D1948;
     case 0x089D194Cu: goto L_089D194C;
     case 0x089D19CCu: goto L_089D19CC;
     case 0x089D1C80u: goto L_089D1C80;
@@ -4063,65 +4091,107 @@ L_089C5A40:
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_089C5A48:
+L_089C5A48: // sceGeListSync(listid, syncType) -> 0
+    ctx.gpr[2] = 0u;
     jump_target = ctx.gpr[31];
-    // nop
     ctx.pc = jump_target;
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_089C5A50:
+L_089C5A50: // sceGeUnsetCallback(id) -> 0
+    ctx.gpr[2] = 0u;
     jump_target = ctx.gpr[31];
-    // nop
     ctx.pc = jump_target;
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_089C5A58:
+L_089C5A58: // sceGeListEnQueueHead(list, stall, cbid, arg) -> list_id
+    { static std::uint32_t s_geqh = 0x80u;
+      ctx.gpr[2] = s_geqh++;
+    }
     jump_target = ctx.gpr[31];
-    // nop
     ctx.pc = jump_target;
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_089C5A60:
+L_089C5A60: // sceGeEdramGetSize() -> 0x200000
+    ctx.gpr[2] = 0x00200000u;
     jump_target = ctx.gpr[31];
-    // nop
     ctx.pc = jump_target;
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_089C5A70:
+L_089C5A68: // sceGeContinue() -> 0
+    ctx.gpr[2] = 0u;
     jump_target = ctx.gpr[31];
-    // nop
     ctx.pc = jump_target;
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_089C5A78:
+L_089C5A70: // sceGeSetCallback(cb) -> 1
+    ctx.gpr[2] = 1u;
     jump_target = ctx.gpr[31];
-    // nop
     ctx.pc = jump_target;
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_089C5A80:
+L_089C5A78: // sceGeListEnQueue(list, stall, cbid, arg) -> list_id
+    { static std::uint32_t s_geq = 1u;
+      static std::uint32_t s_geq_real = 0u;
+      const std::uint32_t phys = ctx.gpr[4] & 0x1FFFFFFFu;
+      if (s_geq_real < 3u && rt.memory().contains(phys, 4u)) {
+          bool interesting = false;
+          for (std::uint32_t p = phys; p < phys + 4096u; p += 4u) {
+              if (!rt.memory().contains(p, 4u)) break;
+              const std::uint32_t c = rt.memory().load32(p);
+              const std::uint8_t op = static_cast<std::uint8_t>(c >> 24);
+              if (op == 0x0Fu) break;
+              if (c != 0u && op != static_cast<std::uint8_t>((p - phys) / 4u)) { interesting = true; break; }
+          }
+          if (interesting) {
+              ++s_geq_real;
+              const std::uint32_t stall_phys = ctx.gpr[5] & 0x1FFFFFFFu;
+              std::printf("[GE] real list #%u phys=0x%08X stall=0x%08X\n", s_geq_real, phys, stall_phys);
+              const std::uint32_t end = stall_phys > phys ? stall_phys : phys + 8192u;
+              for (std::uint32_t p = phys; p < end && p < phys + 65536u; p += 4u) {
+                  if (!rt.memory().contains(p, 4u)) break;
+                  const std::uint32_t cmd = rt.memory().load32(p);
+                  std::printf("  op=0x%02X arg=0x%06X\n", cmd >> 24, cmd & 0xFFFFFFu);
+                  if ((cmd >> 24) == 0x0Fu) break;
+              }
+          }
+      }
+      ctx.gpr[2] = s_geq++;
+    }
     jump_target = ctx.gpr[31];
-    // nop
     ctx.pc = jump_target;
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_089C5A90:
+L_089C5A80: // sceGeDrawSync(syncType) -> 0
+    ctx.gpr[2] = 0u;
     jump_target = ctx.gpr[31];
-    // nop
     ctx.pc = jump_target;
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_089C5A98:
+L_089C5A88: // sceGeBreak(mode, pbresult) -> 0
+    ctx.gpr[2] = 0u;
     jump_target = ctx.gpr[31];
-    // nop
+    ctx.pc = jump_target;
+    local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+    return;
+L_089C5A90: // sceGeListUpdateStallAddr(listid, stall) -> 0
+    ctx.gpr[2] = 0u;
+    jump_target = ctx.gpr[31];
+    ctx.pc = jump_target;
+    local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+    return;
+L_089C5A98: // sceGeEdramGetAddr() -> 0x04000000
+    ctx.gpr[2] = 0x04000000u;
+    jump_target = ctx.gpr[31];
     ctx.pc = jump_target;
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
@@ -4154,16 +4224,76 @@ L_089C5AB8:
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_089C5AC0:
+L_089C5AC0: // sceDisplaySetFrameBuf(buf, bufWidth, pixelFormat, sync)
+    { const std::uint32_t buf_va   = ctx.gpr[4];
+      const std::uint32_t buf_w    = ctx.gpr[5];
+      const std::uint32_t fmt      = ctx.gpr[6];
+      // Dump display list from the GE slot. DAT_09af6830 = current slot ptr (set by FUN_0899f5a4).
+      // slot[2] = write cursor (advances as commands are emitted). slot[1] = start address.
+      // The DL buffer address comes from DAT_089D5EC0[DAT_089D5EC0[0x8C0/4]].
+      static std::uint32_t s_frame = 0u;
+      ++s_frame;
+      if (s_frame <= 3u || (s_frame & 0x3Fu) == 0u) {
+          // Read current slot pointer
+          const std::uint32_t slot_ptr_va = 0x09AF6830u;
+          if (rt.memory().contains(slot_ptr_va, 4u)) {
+              const std::uint32_t slot_ptr = rt.memory().load32(slot_ptr_va);
+              // Also read from DAT_089D5EC0 to find DL buffer directly
+              const std::uint32_t gfx_base = 0x089D5EC0u;
+              std::uint32_t dl_buf = 0u;
+              if (rt.memory().contains(gfx_base + 0x8C0u, 4u)) {
+                  const std::uint32_t idx = rt.memory().load32(gfx_base + 0x8C0u);
+                  if (idx < 2u && rt.memory().contains(gfx_base + idx * 4u, 4u))
+                      dl_buf = rt.memory().load32(gfx_base + idx * 4u) & 0x1FFFFFFFu;
+              }
+              std::uint32_t dl_start = 0u, dl_end = 0u;
+              if (slot_ptr && rt.memory().contains(slot_ptr, 12u)) {
+                  dl_start = rt.memory().load32(slot_ptr + 4u) & 0x1FFFFFFFu;
+                  dl_end   = rt.memory().load32(slot_ptr + 8u) & 0x1FFFFFFFu;
+              }
+              std::printf("[DL#%u] slot=0x%08X start=0x%08X end=0x%08X len=%u dlbuf=0x%08X\n",
+                  s_frame, slot_ptr, dl_start, dl_end,
+                  dl_end > dl_start ? (dl_end - dl_start) / 4u : 0u, dl_buf);
+              // Dump actual commands
+              const std::uint32_t dump_start = dl_buf ? dl_buf : dl_start;
+              const std::uint32_t dump_end   = dl_end;
+              if (dump_start && dump_end > dump_start) {
+                  std::uint32_t shown = 0u;
+                  for (std::uint32_t p = dump_start; p < dump_end; p += 4u) {
+                      if (!rt.memory().contains(p, 4u)) break;
+                      const std::uint32_t cmd = rt.memory().load32(p);
+                      const std::uint8_t op = static_cast<std::uint8_t>(cmd >> 24);
+                      // Skip bone matrix data (0x9E/0x9F) to find actual draw commands
+                      if (op == 0x9Eu || op == 0x9Fu) continue;
+                      if (cmd != 0u && shown < 128u) {
+                          std::printf("  [0x%08X] op=0x%02X arg=0x%06X\n", p, op, cmd & 0xFFFFFFu);
+                          ++shown;
+                      }
+                  }
+              }
+          }
+      }
+      if (buf_va >= 0x04000000u) {
+          const std::size_t vram_off = buf_va - 0x04000000u;
+          const auto &vram = rt.memory().vram_bytes();
+          if (vram_off < vram.size()) {
+              d012::display_present(vram.data() + vram_off,
+                                    static_cast<int>(buf_w),
+                                    static_cast<int>(fmt));
+              d012::display_pump();
+          }
+      }
+    }
+    ctx.gpr[2] = 0u;
     jump_target = ctx.gpr[31];
     // nop
     ctx.pc = jump_target;
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_089C5AC8:
+L_089C5AC8: // sceDisplayWaitVblankStartCB() -> 0
+    ctx.gpr[2] = 0u;
     jump_target = ctx.gpr[31];
-    // nop
     ctx.pc = jump_target;
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
@@ -4182,7 +4312,11 @@ L_089C5AD8:
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_089C5AE0:
+L_089C5AE0: // sceDisplaySetMode(mode, width, height)
+    { static bool s_once = false; if (!s_once) { s_once = true;
+          std::printf("[DISPLAY] sceDisplaySetMode mode=%u w=%u h=%u\n",
+                      ctx.gpr[4], ctx.gpr[5], ctx.gpr[6]); } }
+    ctx.gpr[2] = 0u;
     jump_target = ctx.gpr[31];
     // nop
     ctx.pc = jump_target;
@@ -4791,9 +4925,16 @@ L_089C5E20:
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_089C5E30:
+L_089C5E30: // sceIoRead(fd, buf_va, size) -> bytes read
+    { const std::uint32_t fd   = ctx.gpr[4];
+      const std::uint32_t buf_va = ctx.gpr[5];
+      const std::uint32_t size = ctx.gpr[6];
+      std::vector<std::uint8_t> tmp(size);
+      const std::int32_t n = d012::io_read(fd, tmp.data(), size);
+      if (n > 0) rt.memory().copy_in(buf_va, std::span<const std::uint8_t>(tmp.data(), static_cast<std::size_t>(n)));
+      ctx.gpr[2] = static_cast<std::uint32_t>(n);
+    }
     jump_target = ctx.gpr[31];
-    // nop
     ctx.pc = jump_target;
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
@@ -4812,9 +4953,9 @@ L_089C5E40:
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_089C5E48:
+L_089C5E48: // sceIoClose(fd) -> 0
+    ctx.gpr[2] = static_cast<std::uint32_t>(d012::io_close(ctx.gpr[4]));
     jump_target = ctx.gpr[31];
-    // nop
     ctx.pc = jump_target;
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
@@ -4875,9 +5016,15 @@ L_089C5E88:
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_089C5E90:
+L_089C5E90: // sceIoWaitAsync(fd, res_ptr) -> 0
+    { const std::uint32_t res_ptr = ctx.gpr[5];
+      if (res_ptr && rt.memory().contains(res_ptr, 8u)) {
+          rt.memory().store32(res_ptr,      0u);
+          rt.memory().store32(res_ptr + 4u, 0u);
+      }
+    }
+    ctx.gpr[2] = 0u;
     jump_target = ctx.gpr[31];
-    // nop
     ctx.pc = jump_target;
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
@@ -4896,9 +5043,9 @@ L_089C5EA0:
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_089C5EA8:
+L_089C5EA8: // sceIoOpen(path, flags, mode) -> fd or error
+    ctx.gpr[2] = d012::io_open(rt.memory().read_c_string(ctx.gpr[4]), ctx.gpr[5]);
     jump_target = ctx.gpr[31];
-    // nop
     ctx.pc = jump_target;
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
@@ -4910,16 +5057,26 @@ L_089C5EB0:
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_089C5EB8:
+L_089C5EB8: // sceIoLseek(fd, offset_hi, offset_lo, whence) -> new pos (64-bit in v1:v0)
+    { const std::int64_t offset = (static_cast<std::int64_t>(ctx.gpr[5]) << 32) | ctx.gpr[6];
+      const std::int64_t pos = d012::io_lseek(ctx.gpr[4], offset, ctx.gpr[7]);
+      ctx.gpr[2] = static_cast<std::uint32_t>(pos & 0xFFFFFFFFu);
+      ctx.gpr[3] = static_cast<std::uint32_t>((static_cast<std::uint64_t>(pos) >> 32) & 0xFFFFFFFFu);
+    }
     jump_target = ctx.gpr[31];
-    // nop
     ctx.pc = jump_target;
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_089C5EC8:
+L_089C5EC8: // sceIoPollAsync(fd, res_ptr) -> 0
+    { const std::uint32_t res_ptr = ctx.gpr[5];
+      if (res_ptr && rt.memory().contains(res_ptr, 8u)) {
+          rt.memory().store32(res_ptr,      0u);
+          rt.memory().store32(res_ptr + 4u, 0u);
+      }
+    }
+    ctx.gpr[2] = 0u;
     jump_target = ctx.gpr[31];
-    // nop
     ctx.pc = jump_target;
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
@@ -4952,16 +5109,13 @@ L_089C5EE8:
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_089C5EF0:
-    jump_target = ctx.gpr[31];
-    // nop
-    ctx.pc = jump_target;
-    local_pc = jump_target;
-    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+L_089C5EF0: // sceKernelExitGame() -> noreturn
+    std::printf("[HLE] sceKernelExitGame\n");
+    rt.stop("sceKernelExitGame");
     return;
-L_089C5EF8:
+L_089C5EF8: // sceKernelRegisterExitCallback(uid) -> 0
+    ctx.gpr[2] = 0u;
     jump_target = ctx.gpr[31];
-    // nop
     ctx.pc = jump_target;
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
@@ -5069,9 +5223,9 @@ L_089C5F68:
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_089C5F70:
+L_089C5F70: // sceKernelCreateSema(name, attr, initVal, maxVal, opt) -> uid
+    ctx.gpr[2] = d012::hle_create_sema(ctx.gpr[6]);
     jump_target = ctx.gpr[31];
-    // nop
     ctx.pc = jump_target;
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
@@ -5083,9 +5237,9 @@ L_089C5F78:
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_089C5F80:
+L_089C5F80: // sceKernelCreateCallback(name, func, arg) -> uid
+    ctx.gpr[2] = d012::hle_create_callback(ctx.gpr[5]);
     jump_target = ctx.gpr[31];
-    // nop
     ctx.pc = jump_target;
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
@@ -5111,9 +5265,10 @@ L_089C5F98:
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_089C5FA0:
+L_089C5FA0: // sceKernelStartThread(uid, arglen, argp) -> 0
+    d012::hle_start_thread(ctx.gpr[4], ctx.gpr[5], ctx.gpr[6]);
+    ctx.gpr[2] = 0u;
     jump_target = ctx.gpr[31];
-    // nop
     ctx.pc = jump_target;
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
@@ -5132,16 +5287,21 @@ L_089C5FB0:
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_089C5FB8:
+L_089C5FB8: // sceKernelGetSystemTimeLow() -> microseconds since start (32-bit)
+    { static const auto s_ktsl_start = std::chrono::steady_clock::now();
+      const auto now = std::chrono::steady_clock::now();
+      const auto us  = std::chrono::duration_cast<std::chrono::microseconds>(now - s_ktsl_start).count();
+      ctx.gpr[2] = static_cast<std::uint32_t>(us & 0xFFFFFFFFu);
+    }
     jump_target = ctx.gpr[31];
-    // nop
     ctx.pc = jump_target;
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_089C5FC0:
+L_089C5FC0: // sceKernelSignalSema(uid, signal) -> 0
+    d012::hle_signal_sema(ctx.gpr[4], ctx.gpr[5]);
+    ctx.gpr[2] = 0u;
     jump_target = ctx.gpr[31];
-    // nop
     ctx.pc = jump_target;
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
@@ -5153,9 +5313,9 @@ L_089C5FC8:
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_089C5FD0:
+L_089C5FD0: // sceKernelCreateThread(name, entry, priority, stackSize, attr, opt) -> uid
+    ctx.gpr[2] = d012::hle_create_thread(ctx.gpr[5], ctx.gpr[6], ctx.gpr[7]);
     jump_target = ctx.gpr[31];
-    // nop
     ctx.pc = jump_target;
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
@@ -5167,9 +5327,9 @@ L_089C5FD8:
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_089C5FE0:
+L_089C5FE0: // sceKernelCreateEventFlag(name, attr, bits, opt) -> uid
+    ctx.gpr[2] = d012::hle_create_event_flag();
     jump_target = ctx.gpr[31];
-    // nop
     ctx.pc = jump_target;
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
@@ -5195,12 +5355,9 @@ L_089C5FF8:
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_089C6000:
-    jump_target = ctx.gpr[31];
-    // nop
-    ctx.pc = jump_target;
-    local_pc = jump_target;
-    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+L_089C6000: // sceKernelExitDeleteThread(status) -> noreturn
+    std::printf("[HLE] sceKernelExitDeleteThread(%d)\n", static_cast<std::int32_t>(ctx.gpr[4]));
+    rt.stop("sceKernelExitDeleteThread");
     return;
 L_089C6010:
     jump_target = ctx.gpr[31];
@@ -5230,12 +5387,9 @@ L_089C6028:
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_089C6030:
-    jump_target = ctx.gpr[31];
-    // nop
-    ctx.pc = jump_target;
-    local_pc = jump_target;
-    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+L_089C6030: // sceKernelExitThread(status) -> noreturn
+    std::printf("[HLE] sceKernelExitThread(%d)\n", static_cast<std::int32_t>(ctx.gpr[4]));
+    rt.stop("sceKernelExitThread");
     return;
 L_089C6040:
     jump_target = ctx.gpr[31];
@@ -10317,6 +10471,69 @@ L_089D18E0:
     rt.unsupported(0x089D18E4u, 0x089A01D0u, "control flow in delay slot"); return;
 L_089D18F4:
     rt.unsupported(0x089D18F8u, 0x089A1340u, "control flow in delay slot"); return;
+L_089D18F8: // GE cmd handler slot 1 (no-op)
+    jump_target = ctx.gpr[31]; ctx.pc = jump_target; local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; } return;
+L_089D18FC: // GE cmd handler slot 2 (no-op)
+    jump_target = ctx.gpr[31]; ctx.pc = jump_target; local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; } return;
+L_089D1900: // GE cmd handler slot 3 (no-op)
+    jump_target = ctx.gpr[31]; ctx.pc = jump_target; local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; } return;
+L_089D1904: // GE cmd handler slot 4 (no-op)
+    jump_target = ctx.gpr[31]; ctx.pc = jump_target; local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; } return;
+L_089D1908: // GE cmd handler slot 5 (no-op)
+    jump_target = ctx.gpr[31]; ctx.pc = jump_target; local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; } return;
+L_089D190C: // GE cmd handler slot 6 (no-op)
+    jump_target = ctx.gpr[31]; ctx.pc = jump_target; local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; } return;
+L_089D1910: // GE cmd handler slot 7 (no-op)
+    jump_target = ctx.gpr[31]; ctx.pc = jump_target; local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; } return;
+L_089D1914: // GE cmd handler slot 8 (no-op)
+    jump_target = ctx.gpr[31]; ctx.pc = jump_target; local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; } return;
+L_089D1918: // GE cmd handler slot 9 (no-op)
+    jump_target = ctx.gpr[31]; ctx.pc = jump_target; local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; } return;
+L_089D191C: // GE cmd handler slot 10 (no-op)
+    jump_target = ctx.gpr[31]; ctx.pc = jump_target; local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; } return;
+L_089D1920: // GE cmd handler slot 11 (no-op)
+    jump_target = ctx.gpr[31]; ctx.pc = jump_target; local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; } return;
+L_089D1924: // GE cmd handler slot 12 (no-op)
+    jump_target = ctx.gpr[31]; ctx.pc = jump_target; local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; } return;
+L_089D1928: // GE cmd handler slot 13 (no-op)
+    jump_target = ctx.gpr[31]; ctx.pc = jump_target; local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; } return;
+L_089D192C: // GE cmd handler slot 14 (no-op)
+    jump_target = ctx.gpr[31]; ctx.pc = jump_target; local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; } return;
+L_089D1930: // GE cmd handler slot 15 (no-op)
+    jump_target = ctx.gpr[31]; ctx.pc = jump_target; local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; } return;
+L_089D1934: // GE cmd handler slot 16 (no-op)
+    jump_target = ctx.gpr[31]; ctx.pc = jump_target; local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; } return;
+L_089D1938: // GE cmd handler slot 17 (no-op)
+    jump_target = ctx.gpr[31]; ctx.pc = jump_target; local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; } return;
+L_089D193C: // GE cmd handler slot 18 (no-op)
+    jump_target = ctx.gpr[31]; ctx.pc = jump_target; local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; } return;
+L_089D1940: // GE cmd handler slot 19 (no-op)
+    jump_target = ctx.gpr[31]; ctx.pc = jump_target; local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; } return;
+L_089D1944: // GE cmd handler slot 20 (no-op)
+    jump_target = ctx.gpr[31]; ctx.pc = jump_target; local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; } return;
+L_089D1948: // GE cmd handler slot 21 (no-op)
+    jump_target = ctx.gpr[31]; ctx.pc = jump_target; local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; } return;
 L_089D194C:
     rt.unsupported(0x089D1950u, 0x089A1F2Cu, "control flow in delay slot"); return;
 L_089D19CC:
@@ -17989,6 +18206,27 @@ void register_generated_unit_14(Runtime &runtime) {
     runtime.register_function(0x089D18CCu, &recomp_unit_0014, "recomp_unit_0014");
     runtime.register_function(0x089D18E0u, &recomp_unit_0014, "recomp_unit_0014");
     runtime.register_function(0x089D18F4u, &recomp_unit_0014, "recomp_unit_0014");
+    runtime.register_function(0x089D18F8u, &recomp_unit_0014, "recomp_unit_0014");
+    runtime.register_function(0x089D18FCu, &recomp_unit_0014, "recomp_unit_0014");
+    runtime.register_function(0x089D1900u, &recomp_unit_0014, "recomp_unit_0014");
+    runtime.register_function(0x089D1904u, &recomp_unit_0014, "recomp_unit_0014");
+    runtime.register_function(0x089D1908u, &recomp_unit_0014, "recomp_unit_0014");
+    runtime.register_function(0x089D190Cu, &recomp_unit_0014, "recomp_unit_0014");
+    runtime.register_function(0x089D1910u, &recomp_unit_0014, "recomp_unit_0014");
+    runtime.register_function(0x089D1914u, &recomp_unit_0014, "recomp_unit_0014");
+    runtime.register_function(0x089D1918u, &recomp_unit_0014, "recomp_unit_0014");
+    runtime.register_function(0x089D191Cu, &recomp_unit_0014, "recomp_unit_0014");
+    runtime.register_function(0x089D1920u, &recomp_unit_0014, "recomp_unit_0014");
+    runtime.register_function(0x089D1924u, &recomp_unit_0014, "recomp_unit_0014");
+    runtime.register_function(0x089D1928u, &recomp_unit_0014, "recomp_unit_0014");
+    runtime.register_function(0x089D192Cu, &recomp_unit_0014, "recomp_unit_0014");
+    runtime.register_function(0x089D1930u, &recomp_unit_0014, "recomp_unit_0014");
+    runtime.register_function(0x089D1934u, &recomp_unit_0014, "recomp_unit_0014");
+    runtime.register_function(0x089D1938u, &recomp_unit_0014, "recomp_unit_0014");
+    runtime.register_function(0x089D193Cu, &recomp_unit_0014, "recomp_unit_0014");
+    runtime.register_function(0x089D1940u, &recomp_unit_0014, "recomp_unit_0014");
+    runtime.register_function(0x089D1944u, &recomp_unit_0014, "recomp_unit_0014");
+    runtime.register_function(0x089D1948u, &recomp_unit_0014, "recomp_unit_0014");
     runtime.register_function(0x089D194Cu, &recomp_unit_0014, "recomp_unit_0014");
     runtime.register_function(0x089D19CCu, &recomp_unit_0014, "recomp_unit_0014");
     runtime.register_function(0x089D1C80u, &recomp_unit_0014, "recomp_unit_0014");

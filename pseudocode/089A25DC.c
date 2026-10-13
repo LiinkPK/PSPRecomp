@@ -1,0 +1,93 @@
+/* Entry 0x089A25DC | file offset 0x0019F5B4 | FUN_089a25dc | bytes 156 */
+
+void FUN_089a25dc(undefined1 (*param_1) [12])
+
+{
+  undefined1 auVar1 [12];
+  undefined1 auVar2 [16];
+  undefined1 auVar3 [16];
+  undefined1 auVar4 [64];
+  undefined1 auVar5 [16];
+  undefined1 auVar6 [16];
+  undefined1 auVar7 [64];
+  undefined1 auVar8 [64];
+  undefined1 (*pauVar9) [64];
+  undefined4 uVar10;
+  
+  pauVar9 = DAT_09af7134;
+  uVar10 = vcst_s(5);
+  auVar1 = vscl_t(*param_1,uVar10);
+  auVar2 = vidt_q();
+  auVar5 = vrot_q(auVar1._0_4_,0,1,2,0);
+  auVar6 = vrot_q(auVar1._0_4_,0,3,1,0);
+  auVar3 = vidt_q();
+  auVar4._48_16_ = auVar3;
+  auVar4._44_4_ = auVar6._12_4_;
+  auVar4._40_4_ = auVar6._8_4_;
+  auVar4._36_4_ = auVar6._4_4_;
+  auVar4._32_4_ = auVar6._0_4_;
+  auVar4._28_4_ = auVar5._12_4_;
+  auVar4._24_4_ = auVar5._8_4_;
+  auVar4._20_4_ = auVar5._4_4_;
+  auVar4._16_4_ = auVar5._0_4_;
+  auVar4._12_4_ = auVar2._12_4_;
+  auVar4._8_4_ = auVar2._8_4_;
+  auVar4._4_4_ = auVar2._4_4_;
+  auVar4._0_4_ = auVar2._0_4_;
+  auVar4 = vmmul_q(auVar4,*DAT_09af7134);
+  auVar5 = vrot_q(auVar1._4_4_,1,0,3,0);
+  auVar2 = vidt_q();
+  auVar6 = vrot_q(auVar1._4_4_,2,0,1,0);
+  auVar3 = vidt_q();
+  auVar7._48_16_ = auVar3;
+  auVar7._44_4_ = auVar6._12_4_;
+  auVar7._40_4_ = auVar6._8_4_;
+  auVar7._36_4_ = auVar6._4_4_;
+  auVar7._32_4_ = auVar6._0_4_;
+  auVar7._28_4_ = auVar2._12_4_;
+  auVar7._24_4_ = auVar2._8_4_;
+  auVar7._20_4_ = auVar2._4_4_;
+  auVar7._16_4_ = auVar2._0_4_;
+  auVar7._12_4_ = auVar5._12_4_;
+  auVar7._8_4_ = auVar5._8_4_;
+  auVar7._4_4_ = auVar5._4_4_;
+  auVar7._0_4_ = auVar5._0_4_;
+  auVar4 = vmmul_q(auVar7,auVar4);
+  auVar5 = vrot_q(auVar1._8_4_,1,2,0,0);
+  auVar6 = vrot_q(auVar1._8_4_,3,1,0,0);
+  auVar2 = vidt_q();
+  auVar3 = vidt_q();
+  auVar8._48_16_ = auVar3;
+  auVar8._44_4_ = auVar2._12_4_;
+  auVar8._40_4_ = auVar2._8_4_;
+  auVar8._36_4_ = auVar2._4_4_;
+  auVar8._32_4_ = auVar2._0_4_;
+  auVar8._28_4_ = auVar6._12_4_;
+  auVar8._24_4_ = auVar6._8_4_;
+  auVar8._20_4_ = auVar6._4_4_;
+  auVar8._16_4_ = auVar6._0_4_;
+  auVar8._12_4_ = auVar5._12_4_;
+  auVar8._8_4_ = auVar5._8_4_;
+  auVar8._4_4_ = auVar5._4_4_;
+  auVar8._0_4_ = auVar5._0_4_;
+  auVar4 = vmmul_q(auVar8,auVar4);
+  *(int *)*DAT_09af7134 = auVar4._0_4_;
+  *(int *)(*pauVar9 + 4) = auVar4._4_4_;
+  *(int *)(*pauVar9 + 8) = auVar4._8_4_;
+  *(int *)(*pauVar9 + 0xc) = auVar4._12_4_;
+  *(int *)(*pauVar9 + 0x10) = auVar4._16_4_;
+  *(int *)(*pauVar9 + 0x14) = auVar4._20_4_;
+  *(int *)(*pauVar9 + 0x18) = auVar4._24_4_;
+  *(int *)(*pauVar9 + 0x1c) = auVar4._28_4_;
+  *(int *)(*pauVar9 + 0x20) = auVar4._32_4_;
+  *(int *)(*pauVar9 + 0x24) = auVar4._36_4_;
+  *(int *)(*pauVar9 + 0x28) = auVar4._40_4_;
+  *(int *)(*pauVar9 + 0x2c) = auVar4._44_4_;
+  *(int *)(*pauVar9 + 0x30) = auVar4._48_4_;
+  *(int *)(*pauVar9 + 0x34) = auVar4._52_4_;
+  *(int *)(*pauVar9 + 0x38) = auVar4._56_4_;
+  *(int *)(*pauVar9 + 0x3c) = auVar4._60_4_;
+  (&DAT_09af7168)[DAT_09af7130] = 1;
+  return;
+}
+

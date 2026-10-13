@@ -1,0 +1,14 @@
+/* Entry 0x0888FCAC | file offset 0x0008CC84 | FUN_0888fcac | bytes 176 */
+
+void FUN_0888fcac(void)
+
+{
+  DAT_09b491e8 = FUN_088d0700(DAT_089d7830,1,0x24a,0x1a);
+  DAT_09b491ec = FUN_088d0700(DAT_089d7830,1,0x24c,0x1b);
+  DAT_09b491f0 = FUN_088d0700(DAT_089d7830,1,0x24e,0x1c);
+  FUN_088db4e4(DAT_09b491e8,200);
+  FUN_088db4e4(DAT_09b491ec,199);
+  FUN_088db4e4(DAT_09b491f0,199);
+  return;
+}
+

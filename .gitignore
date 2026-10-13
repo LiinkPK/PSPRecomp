@@ -53,7 +53,7 @@ __pycache__/
 *.pyc
 
 # Other Files
-Roadmap.pdf
+Roadmap.*
 .aider*
 .claude*
 .continue*

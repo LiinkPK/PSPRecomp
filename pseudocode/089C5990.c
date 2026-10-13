@@ -1,0 +1,9 @@
+/* Entry 0x089C5990 | file offset 0x001C2968 | sceNetAdhocctlGetPeerList | bytes 8 */
+/* PSP IMPORT STUB: the PSP loader resolves this placeholder to a firmware/library service. This body does not describe the service implementation. */
+
+void sceNetAdhocctlGetPeerList(void)
+
+{
+  return;
+}
+

@@ -2,6 +2,7 @@ set(D012_PROFILE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 
 set(D012_GENERATED
 
+    "${D012_PROFILE_DIR}/generated/generated_init_funcs.cpp"
     "${D012_PROFILE_DIR}/generated/generated_registry.cpp"
     "${D012_PROFILE_DIR}/generated/generated_unit_0000.cpp"
     "${D012_PROFILE_DIR}/generated/generated_unit_0001.cpp"
@@ -43,6 +44,7 @@ add_executable(d012_native
     ${D012_GENERATED}
     "${D012_PROFILE_DIR}/host/main.cpp"
     "${D012_PROFILE_DIR}/host/d012_profile.cpp"
+    "${D012_PROFILE_DIR}/host/win32_display.cpp"
 )
 
 target_include_directories(d012_native PRIVATE
@@ -54,7 +56,7 @@ target_include_directories(d012_native PRIVATE
 target_link_libraries(d012_native PRIVATE psprecomp_core)
 
 if(WIN32)
-    target_link_libraries(d012_native PRIVATE winmm)
+    target_link_libraries(d012_native PRIVATE winmm gdi32 user32)
 endif()
 
 if(MSVC)

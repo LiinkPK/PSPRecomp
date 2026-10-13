@@ -7953,6 +7953,8 @@ L_08865ED0:
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(0), ctx.gpr[16]);
     ctx.gpr[16] = (aot_mem.aot_load32(ctx.gpr[17] + static_cast<std::uint32_t>(24256)));
     ctx.gpr[4] = (static_cast<std::uint32_t>(static_cast<std::int32_t>(static_cast<std::int8_t>(aot_mem.aot_load8(ctx.gpr[16] + static_cast<std::uint32_t>(11472))))));
+    { static std::uint8_t s_last_state = 0xFFu;
+      if (ctx.gpr[4] != s_last_state) { s_last_state = static_cast<std::uint8_t>(ctx.gpr[4]); std::printf("[DBG] FUN_08865ED0 state=%u\n", ctx.gpr[4]); std::fflush(stdout); } }
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(8), ctx.gpr[31]);
     { const bool branch_taken = ctx.gpr[4] == 0u;
     // nop
@@ -53618,6 +53620,28 @@ L_0888223C:
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
 L_08882250:
+    { static std::uint32_t s_sched_call = 0u;
+      ++s_sched_call;
+      if (s_sched_call <= 10u || (s_sched_call & 0xFFFFu) == 0u) {
+          const std::uint32_t ts = ctx.gpr[4];
+          const std::uint32_t list  = aot_mem.aot_load32(ts + 8192u);
+          const std::uint32_t mask  = aot_mem.aot_load32(ts + 8196u);
+          const std::uint32_t val   = aot_mem.aot_load32(ts + 8200u);
+          std::printf("[SCHED#%u] list=0x%08X mask=0x%08X val=0x%08X\n", s_sched_call, list, mask, val);
+          // Print tasks and their dispatch eligibility
+          if (list) {
+              std::uint32_t tp = aot_mem.aot_load32(list + 4u);
+              for (int ti = 0; ti < 8 && tp; ++ti) {
+                  const std::uint32_t fn   = aot_mem.aot_load32(tp + 0u);
+                  const std::uint32_t flags= aot_mem.aot_load32(tp + 40u);
+                  std::printf("  task[%d]=0x%08X fn=0x%08X flags=0x%08X eligible=%s\n",
+                      ti, tp, fn, flags, (flags & mask) == val ? "YES" : "NO");
+                  tp = aot_mem.aot_load32(tp + 0x34u);  // next ptr at offset 0x34
+              }
+          }
+          std::fflush(stdout);
+      }
+    }
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-16));
     ctx.gpr[5] = (aot_mem.aot_load32(ctx.gpr[4] + static_cast<std::uint32_t>(8196)));
     ctx.gpr[6] = (aot_mem.aot_load32(ctx.gpr[4] + static_cast<std::uint32_t>(8200)));
@@ -53969,13 +53993,42 @@ L_0888251C:
     aot_mem.aot_store32(ctx.gpr[19] + static_cast<std::uint32_t>(68), ctx.gpr[17]);
     ctx.gpr[5] = (aot_mem.aot_load32(ctx.gpr[19] + static_cast<std::uint32_t>(0)));
     aot_mem.aot_store32(ctx.gpr[19] + static_cast<std::uint32_t>(72), ctx.gpr[18]);
+    { static std::uint32_t s_dispatch_count = 0u;
+      ++s_dispatch_count;
+      if (s_dispatch_count <= 5u || (s_dispatch_count & 0xFFFu) == 0u) {
+          std::printf("[TASK] dispatch #%u task=0x%08X fn=0x%08X\n", s_dispatch_count, ctx.gpr[19], ctx.gpr[5]);
+          std::fflush(stdout);
+      }
+    }
     jump_target = ctx.gpr[5];
     ctx.gpr[31] = (0x08882530u);
     ctx.gpr[4] = (ctx.gpr[19] | 0u);
     ctx.pc = jump_target;
-    if (rt.invoke_chained_call(ctx, &aot_mem) && ctx.pc == 0x08882530u) goto L_08882530;
-    return;
+    { const std::uint32_t task_fn_saved = jump_target;
+      int chain_iters = 0;
+      while (true) {
+          bool ok = rt.invoke_chained_call(ctx, &aot_mem);
+          if (ok && ctx.pc == 0x08882530u) goto L_08882530;
+          if (ok) {
+              // chain returned but pc != 0x08882530 — genuine early exit
+              static std::uint32_t s_bad = 0u; ++s_bad;
+              if (s_bad <= 5u || (s_bad & 0xFFFu) == 0u)
+                  std::printf("[CHAIN-BAD#%u] fn=0x%08X pc=0x%08X after %d iters\n", s_bad, task_fn_saved, ctx.pc, chain_iters);
+              return;
+          }
+          // budget exhausted — ctx.pc is where execution paused; re-enter
+          ++chain_iters;
+          if (chain_iters > 512) {
+              static std::uint32_t s_stuck = 0u; ++s_stuck;
+              if (s_stuck <= 5u) std::printf("[CHAIN-STUCK#%u] fn=0x%08X stuck at pc=0x%08X\n", s_stuck, task_fn_saved, ctx.pc);
+              return;
+          }
+      }
+    }
 L_08882530:
+    { static std::uint32_t s_ok = 0u; ++s_ok;
+      if (s_ok <= 8u || (s_ok & 0xFFFu) == 0u) { std::printf("[TASK-OK#%u] task=0x%08X fn=0x%08X\n", s_ok, ctx.gpr[19], ctx.gpr[5]); std::fflush(stdout); }
+    }
     ctx.gpr[17] = (aot_mem.aot_load32(ctx.gpr[19] + static_cast<std::uint32_t>(68)));
     ctx.gpr[18] = (aot_mem.aot_load32(ctx.gpr[19] + static_cast<std::uint32_t>(72)));
     goto L_08882538;
