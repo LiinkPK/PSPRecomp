@@ -131,7 +131,7 @@ All PSP import stubs cluster in unit 14 (`0x089C4040`–`0x089C6040`). The gener
 
 ---
 
-## Current status (as of 2026-10-13, session 4)
+## Current status (as of 2026-10-14, session 5)
 
 **Rendering gate `DAT_089D69DC` is now open (dc=01) from frame 2 onward.** ✅
 **`DAT_089D69E0` (render object ptr) is now set to `0x08C13A94` by `FUN_088769CC`.** ✅
@@ -141,7 +141,8 @@ All PSP import stubs cluster in unit 14 (`0x089C4040`–`0x089C6040`). The gener
 **Audio channel search infinite loop bypassed (`FUN_088A0EEC` stub → -1).** ✅
 **`FUN_08869AB4` null deref fixed (not-found path instead of self-loop).** ✅
 **Menu MPK files extracted from PACKAGE.BIN, game proceeds past archive init.** ✅
-**Current blocker: `FUN_088D2B40` crash — gpr[16] clobbered before aot_load16.** ❌
+**Init sequence completes. Task scheduler runs 8+ tasks per frame.** ✅
+**Current blocker: task loop — CHAIN-BAD tasks returning corrupt ra=0x8888505B, unregistered 0x08C13B40.** ❌
 
 ### What was done this session (session 4)
 
@@ -171,11 +172,20 @@ All PSP import stubs cluster in unit 14 (`0x089C4040`–`0x089C6040`). The gener
 #### main.bin MPK contents (13 entries)
 `battle.bin`, `objentry.bin`, `system.bin`, `mapentry.bin`, `manual_param.bin`, `ptcommand.bin`, `voice_priority_parameter.bin`, `resident.frr`, `snd_menu.scd`, `snd_common.scd`, `bgm_entry.bin`, `se_override.bin`, `assist.bin`
 
-### Current blocker: gpr[16] clobbered at `L_088D2B40`
+### Session 5 crash fixes
 
-After `FUN_08869AB4` returns null and takes the not-found path through `L_088D2AA0`, the code calls several functions (including `FUN_088FE944` in unit 7). One of these clobbers gpr[16] (s0, a callee-saved register), leaving it as `0x0000000A` instead of the MPK chunk pointer `0x09EFFB20`. Then `L_088D2B40` executes `aot_load16(gpr[16]+0)` → crash at `0x0000000A`.
+| Crash | Fix | File |
+|---|---|---|
+| `L_088D2B40` null buf crash | Skip to `L_088D2E2C` when gpr[17]=0 | `generated_unit_0006.cpp` |
+| `L_088AECBC/CF0/ED24/ED98` FUN_08869AB4 null | Null guards store 0 and skip to next label | `generated_unit_0005.cpp` |
+| `L_08813604` sub-pointer null | Skip call if gpr[16]+4 = 0 | `generated_unit_0000.cpp` |
+| `0x089389E0` unregistered jump-table target | Added stub + dispatch case in unit 9 | `generated_unit_0009.cpp` |
+| `0x001ECF3B` unregistered (bad fn ptr) | Guard at `L_0886313C` skips call if outside RAM | `generated_unit_0002.cpp` |
+| `FUN_08872F08` VRAM read crash | Stubbed — reads `0x0A000000` (VRAM mirror), unsupported | `generated_unit_0003.cpp` |
 
-A guard to reload gpr[16] from sp+80 was added but the full rebuild is in progress to confirm it fires.
+### Current blocker: task loop — CHAIN-BAD / unregistered 0x08C13B40
+
+After init, the task scheduler fires. Several tasks return to `ra=0x8888505B` (corrupt — float data misread as return address). One task tries to jump to `0x08C13B40` (heap-allocated, not a recompiled function — may be a dynamically-created callback).
 
 ### Known archive paths in ELF binary (baked in at compile time)
 ```

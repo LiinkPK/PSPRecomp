@@ -673,6 +673,12 @@ void Runtime::run(std::uint32_t entry, std::uint64_t max_dispatches) {
             RecompiledFunction function = lookup_generated_unit(before);
             if (function == nullptr) function = lookup_function(before);
             if (function == nullptr) {
+                std::printf("[UNREGISTERED] pc=0x%08X last=0x%08X ra=0x%08X sp=0x%08X\n", before, last_dispatch_pc, cpu_.gpr[31], cpu_.gpr[29]); fflush(stdout);
+                // dump stack frame around sp
+                for (int i = -4; i <= 16; i += 4) {
+                    std::uint32_t addr = cpu_.gpr[29] + static_cast<std::uint32_t>(i * 4);
+                    if (memory_.contains(addr, 4u)) std::printf("  sp%+d = 0x%08X\n", i*4, memory_.load32(addr));
+                }
                 stop("No recompiled function registered at " + hex32(before));
                 break;
             }

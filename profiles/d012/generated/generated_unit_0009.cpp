@@ -3233,6 +3233,7 @@ LOCAL_DISPATCH:
     case 0x08938540u: goto L_08938540;
     case 0x08938544u: goto L_08938544;
     case 0x08938578u: goto L_08938578;
+    case 0x089389E0u: goto L_089389E0;
     case 0x08938F34u: goto L_08938F34;
     case 0x08938F3Cu: goto L_08938F3C;
     case 0x08938F80u: goto L_08938F80;
@@ -33573,6 +33574,9 @@ L_08938578:
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
+L_089389E0: // jump table target for some character — treat as no-op, continue outer loop
+    { static bool once=false; if(!once){once=true; std::printf("[089389E0] char-dispatch stub hit ra=0x%08X gpr7=0x%08X\n", ctx.gpr[31], ctx.gpr[7]); fflush(stdout);} }
+    goto L_08938F34;
 L_08938F34:
     { const bool branch_taken = ctx.gpr[16] == 0u;
     ctx.gpr[23] = (ctx.gpr[29] + static_cast<std::uint32_t>(8));
@@ -52927,6 +52931,7 @@ void recomp_unit_0009(Runtime &rt, AllegrexContext &ctx) {
 
 void register_generated_unit_9(Runtime &runtime) {
     runtime.register_generated_unit(9u, 0x08924040u, 131072u, &recomp_unit_0009, &recomp_unit_0009_entry);
+    runtime.register_function(0x089389E0u, &recomp_unit_0009, "recomp_unit_0009");
     runtime.register_function(0x08924CE4u, &recomp_unit_0009, "recomp_unit_0009");
     runtime.register_function(0x08924D00u, &recomp_unit_0009, "recomp_unit_0009");
     runtime.register_function(0x08924D0Cu, &recomp_unit_0009, "recomp_unit_0009");

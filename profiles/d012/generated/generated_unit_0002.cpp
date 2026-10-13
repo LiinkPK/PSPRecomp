@@ -53266,6 +53266,11 @@ L_08863104:
     ctx.gpr[8] = (aot_mem.aot_load32(ctx.gpr[8] + static_cast<std::uint32_t>(4)));
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(0), ctx.gpr[31]);
     jump_target = ctx.gpr[8];
+    if (jump_target < 0x08800000u || jump_target >= 0x09F00000u) {
+        { static bool once=false; if(!once){once=true; std::printf("[0886313C] bad fn ptr 0x%08X from gpr8=0x%08X, skipping\n", jump_target, ctx.gpr[8]); fflush(stdout);} }
+        ctx.gpr[2] = 0u;
+        goto L_0886313C;
+    }
     ctx.gpr[31] = (0x0886313Cu);
     ctx.gpr[4] = (ctx.gpr[4] + ctx.gpr[9]);
     ctx.pc = jump_target;

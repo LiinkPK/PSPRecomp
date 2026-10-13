@@ -30324,6 +30324,10 @@ L_088726E0:
       goto L_088726F4;
     }
 L_088726F4:
+    if (ctx.gpr[5] < 0x08800000u || ctx.gpr[5] >= 0x09F00000u) {
+        { static bool once=false; if(!once){once=true; std::printf("[088726F4] gpr[5]=0x%08X out of RAM, skipping\n", ctx.gpr[5]); fflush(stdout);} }
+        goto L_08872714;
+    }
     ctx.gpr[8] = (ctx.gpr[4] | 0u);
     ctx.gpr[7] = (aot_mem.aot_load32(ctx.gpr[5] + static_cast<std::uint32_t>(4)));
     ctx.gpr[6] = (aot_mem.aot_load32(ctx.gpr[5] + static_cast<std::uint32_t>(0)));
@@ -30915,7 +30919,14 @@ L_08872ED8:
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_08872F08:
+L_08872F08: // display task — reads VRAM, stub until VRAM access is supported
+    { static bool once=false; if(!once){once=true; std::printf("[08872F08] display task stub\n"); fflush(stdout);} }
+    ctx.gpr[2] = 0u;
+    jump_target = ctx.gpr[31];
+    ctx.pc = jump_target; local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+    return;
+L_08872F08_orig_unused:
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-16));
     ctx.gpr[4] = (2205u << 16u);
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(0), ctx.gpr[16]);

@@ -23008,6 +23008,7 @@ L_088AEC84:
     if (rt.invoke_chained_direct<&recomp_unit_0003_entry, 3u, 876u, 0x08869AB4u>(ctx, &aot_mem) && ctx.pc == 0x088AECBCu) goto L_088AECBC;
     return;
 L_088AECBC:
+    if (ctx.gpr[2] == 0u) { aot_mem.aot_store32(ctx.gpr[17] + static_cast<std::uint32_t>(3784), 0u); aot_mem.aot_store32(ctx.gpr[17] + static_cast<std::uint32_t>(3788), 0u); goto L_088AECE0; }
     ctx.gpr[18] = (ctx.gpr[2] | 0u);
     ctx.gpr[4] = (aot_mem.aot_load32(ctx.gpr[18] + static_cast<std::uint32_t>(8)));
     ctx.gpr[31] = (0x088AECCCu);
@@ -23030,6 +23031,7 @@ L_088AECE0:
     if (rt.invoke_chained_direct<&recomp_unit_0003_entry, 3u, 876u, 0x08869AB4u>(ctx, &aot_mem) && ctx.pc == 0x088AECF0u) goto L_088AECF0;
     return;
 L_088AECF0:
+    if (ctx.gpr[2] == 0u) { aot_mem.aot_store32(ctx.gpr[17] + static_cast<std::uint32_t>(3792), 0u); aot_mem.aot_store32(ctx.gpr[17] + static_cast<std::uint32_t>(3796), 0u); goto L_088AED14; }
     ctx.gpr[18] = (ctx.gpr[2] | 0u);
     ctx.gpr[4] = (aot_mem.aot_load32(ctx.gpr[18] + static_cast<std::uint32_t>(8)));
     ctx.gpr[31] = (0x088AED00u);
@@ -23052,6 +23054,7 @@ L_088AED14:
     if (rt.invoke_chained_direct<&recomp_unit_0003_entry, 3u, 876u, 0x08869AB4u>(ctx, &aot_mem) && ctx.pc == 0x088AED24u) goto L_088AED24;
     return;
 L_088AED24:
+    if (ctx.gpr[2] == 0u) { aot_mem.aot_store32(ctx.gpr[17] + static_cast<std::uint32_t>(3800), 0u); aot_mem.aot_store32(ctx.gpr[17] + static_cast<std::uint32_t>(3804), 0u); goto L_088AED48; }
     ctx.gpr[18] = (ctx.gpr[2] | 0u);
     ctx.gpr[4] = (aot_mem.aot_load32(ctx.gpr[18] + static_cast<std::uint32_t>(8)));
     ctx.gpr[31] = (0x088AED34u);
@@ -23116,6 +23119,7 @@ L_088AED84:
     if (rt.invoke_chained_direct<&recomp_unit_0003_entry, 3u, 876u, 0x08869AB4u>(ctx, &aot_mem) && ctx.pc == 0x088AED98u) goto L_088AED98;
     return;
 L_088AED98:
+    if (ctx.gpr[2] == 0u) { ctx.gpr[18] = 0u; ctx.gpr[19] = 0u; goto L_088AEDA8; }
     ctx.gpr[16] = (aot_mem.aot_load32(ctx.gpr[17] + static_cast<std::uint32_t>(3808)));
     ctx.gpr[18] = (aot_mem.aot_load32(ctx.gpr[2] + static_cast<std::uint32_t>(4)));
     ctx.gpr[31] = (0x088AEDA8u);

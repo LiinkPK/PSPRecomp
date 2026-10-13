@@ -28548,6 +28548,7 @@ L_088135F8:
     }
 L_08813604:
     ctx.gpr[16] = (aot_mem.aot_load32(ctx.gpr[16] + static_cast<std::uint32_t>(4)));
+    if (ctx.gpr[16] == 0u) goto L_08813610; // sub-pointer not yet initialized, skip
     ctx.gpr[31] = (0x08813610u);
     ctx.gpr[4] = (ctx.gpr[16] | 0u);
     if (rt.invoke_chained_direct<&recomp_unit_0002_entry, 2u, 4041u, 0x0885C93Cu>(ctx, &aot_mem) && ctx.pc == 0x08813610u) goto L_08813610;
