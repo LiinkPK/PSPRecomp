@@ -5540,6 +5540,8 @@ L_089C6098: // sceKernelVolatileMemLock(mode, paddr_out, psize_out) -> 0
       const std::uint32_t vol_size = 0x00008000u; // 32 KB
       const std::uint32_t p_addr_out = ctx.gpr[5]; // pointer to store address
       const std::uint32_t p_size_out = ctx.gpr[6]; // pointer to store size
+      std::printf("[VMEM] VolatileMemLock: mode=%u p_addr=0x%08X p_size=0x%08X\n",
+                  ctx.gpr[4], p_addr_out, p_size_out);
       if (p_addr_out && rt.memory().contains(p_addr_out, 4u))
           rt.memory().store32(p_addr_out, vol_addr);
       if (p_size_out && rt.memory().contains(p_size_out, 4u))
