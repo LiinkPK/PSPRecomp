@@ -1,4 +1,4 @@
-# PSPRecomp – Dissidia 012 (ULES01505_FFSTJP.BIN) – Current State
+# PSPRecomp – Dissidia 012 (ULES01505.BIN) – Current State
 
 **Last updated:** 2026-10-13
 
@@ -131,18 +131,20 @@ All PSP import stubs cluster in unit 14 (`0x089C4040`–`0x089C6040`). The gener
 
 ---
 
-## Current status
+## Current status (as of 2026-10-13)
 
 **The game reaches its main loop and runs stably.** `sceDisplaySetFrameBuf` fires every frame with valid VRAM addresses. No crashes.
 
-**Phase 1** (thread/kernel): ✅ complete  
-**Phase 2** (file I/O):
-- p2-t1 (`sceIoOpen/Read/Close/Lseek`): ⚠ stub logs call but returns ENOENT — real fopen impl needed in unit 14
-- p2-t2 (path mapping `disc0:/` → local dir): ⚠ `rt.translate_path()` exists but game hasn't opened any files yet
-- p2-t3 (bypass early asset crashes): pending
+**Task scheduler confirmed working.** 6 tasks dispatched every frame including `FUN_088838F8` (render task) and `FUN_08883EE8` (DL builder). Both run but exit immediately (0 iterations) because the rendering gate is closed.
 
-**Phase 3** (graphics): pending — VRAM is populated by GE, needs host window + blitter
+**Rendering gate `DAT_089D69DC` is always 0 — this is the current blocker.**
 
-**Next steps:**
-1. Implement real `sceIoOpen/Read/Close/Lseek` in `generated_unit_0014.cpp` (p2-t1)
-2. Add SDL2/Win32 window and blit VRAM each frame `sceDisplaySetFrameBuf` is called (p3)
+Root cause chain:
+1. Gate set by `FUN_088839F8` → `FUN_08882E80` → `sceKernelVolatileMemLock`
+2. `sceKernelVolatileMemLock` at `0x089C6098` is now implemented (returns 0, writes 0x10000 to out-ptr) ✅
+3. But `FUN_088839F8` is only called from `FUN_08883340`, which is only called from UMD callback `FUN_08883998`
+4. `FUN_08883998` is registered (uid=257) but never fired because `FUN_08863208` (UMD manager init at `0x08863208` in unit 2) is skipped
+
+**Next step:** Fire `FUN_08883998` with `gpr[5] = 0x00090000` from `sceUmdGetDriveStat` on first call. This triggers `FUN_08883340` → opens the rendering gate → render objects start enqueuing → `FUN_08883EE8` builds the DL chain → `DAT_09AF719C` gets populated → actual PRIM commands render to VRAM.
+
+Once gate opens → verify `DAT_09AF719C` gets populated → verify non-zero pixels in VRAM → get visible output.
