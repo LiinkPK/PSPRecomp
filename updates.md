@@ -142,8 +142,7 @@ All PSP import stubs cluster in unit 14 (`0x089C4040`–`0x089C6040`). The gener
 **`FUN_08869AB4` null deref fixed (not-found path instead of self-loop).** ✅
 **Menu MPK files extracted from PACKAGE.BIN, game proceeds past archive init.** ✅
 **Init sequence completes. Task scheduler runs 8+ tasks per frame.** ✅
-**`guest_memory` canonical() mask updated: `0x0A000000` (uncached RAM mirror) now maps correctly to `0x08000000`.** ✅
-**Current blocker: display task `FUN_08872F08` — crashes fixed; next crash TBD after rebuild.** ❓
+**Current blocker: display task `FUN_08872F08` — crash at `0x0C000004` (VRAM write-combine alias not mapped).** ❌
 
 ### What was done this session (session 4)
 
@@ -184,12 +183,14 @@ All PSP import stubs cluster in unit 14 (`0x089C4040`–`0x089C6040`). The gener
 | `0x001ECF3B` unregistered (bad fn ptr) | Guard at `L_0886313C` skips call if outside RAM | `generated_unit_0002.cpp` |
 | `FUN_08872F08` VRAM read crash | Stubbed — reads `0x0A000000` (VRAM mirror), unsupported | `generated_unit_0003.cpp` |
 
-### Session 6 crash fixes
+### Session 6 crash fixes / investigation
 
-| Crash | Root cause | Fix | File |
-|---|---|---|---|
-| `0x0A000004` in `FUN_08872F08` display task | `0x0A000000` = uncached RAM mirror; `canonical()` mask `0x1FFFFFFF` didn't remap it to `0x08000000` | Changed mask to `0x1DFFFFFFu` (strips bit 25) in `guest_memory.hpp` — `ram_offset_of`, `ram_offset_of_fast`, `canonical` | `include/psprecomp/guest_memory.hpp` |
-| Guards at `L_088726B0`, `L_088726F4`, `L_0887263C` | Added during investigation; not the real crash path (crash was in the memory layer) | Left in as defensive checks | `generated_unit_0003.cpp` |
+| Crash | Root cause | Status |
+|---|---|---|
+| `0x0A000004` in task 3 `FUN_08872F08` | Traced through unit 9 → unit 3 `L_0887263C`, `gpr[8]+4` where `gpr[8]=0x0A000000`. Defensive guards added at `L_088726B0`, `L_088726F4`, `L_0887263C` in unit 3 | Guards left in; crash source is `gpr[16]+64` storing the VRAM ptr `0x0A000000` |
+| `0x0C000004` (after investigation) | `gpr[8]=0x0C000000` loaded from `gpr[8]+4` where `gpr[8]=0x0A000000`. `0x0C000000` = PSP write-combine VRAM alias (`0x4C000000 & 0x1FFFFFFF`) — not handled by `is_vram_window` which only covers `0x04000000–0x04800000` | **Next session**: add `0x0C000000` VRAM mirror to `is_vram_window` in `guest_memory.cpp` |
+
+**Root fix needed**: `GuestMemory::is_vram_window()` must also accept `0x0C000000–0x0C800000` (write-combine VRAM aperture). Then `0x0C000000+4` will resolve to VRAM offset 4 instead of throwing.
 
 ### Current blocker: task loop — CHAIN-BAD / unregistered 0x08C13B40
 
