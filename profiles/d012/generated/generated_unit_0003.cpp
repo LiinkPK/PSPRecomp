@@ -24080,19 +24080,13 @@ L_0886EEB0:
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_0886EEBC:
-    ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-304));
-    aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(276), ctx.gpr[16]);
-    ctx.gpr[16] = (ctx.gpr[6] & 255u);
-    ctx.gpr[4] = (ctx.gpr[5] | 0u);
-    aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(280), ctx.gpr[17]);
-    aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(284), ctx.gpr[18]);
-    aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(288), ctx.gpr[31]);
-    ctx.gpr[5] = (ctx.gpr[4] | 0u);
-    ctx.gpr[17] = (ctx.gpr[16] | 0u);
-    ctx.gpr[31] = (0x0886EEE8u);
-    ctx.gpr[4] = (ctx.gpr[29] | 0u);
-    if (rt.invoke_chained_direct<&recomp_unit_0002_entry, 2u, 4859u, 0x08863048u>(ctx, &aot_mem) && ctx.pc == 0x0886EEE8u) goto L_0886EEE8;
+L_0886EEBC: // FUN_0886EEBC: sceKernelLoadModule stub — return 1 (fake handle), skip PRX busy-loop
+    { static bool once=false; if(!once){once=true; std::printf("[HLE] 0886EEBC sceKernelLoadModule skipped, returning handle=1\n"); fflush(stdout);} }
+    ctx.gpr[2] = 1u; // fake positive module handle
+    jump_target = ctx.gpr[31];
+    ctx.pc = jump_target;
+    local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
 L_0886EEE8:
     ctx.gpr[16] = (ctx.gpr[29] + static_cast<std::uint32_t>(256));
@@ -24930,7 +24924,15 @@ L_0886F5B4:
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_0886F688:
+L_0886F688: // FUN_0886F688: streaming worker init — stub as success (skip ms0: PARAM.SFO check)
+    { static bool once=false; if(!once){once=true; std::printf("[HLE] 0886F688 streaming worker init -> 0 (success)\n"); fflush(stdout);} }
+    ctx.gpr[2] = 0u;
+    jump_target = ctx.gpr[31];
+    ctx.pc = jump_target;
+    local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+    return;
+L_0886F688_orig_unused:
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-160));
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(148), ctx.gpr[21]);
     ctx.gpr[21] = (2205u << 16u);
@@ -25084,7 +25086,15 @@ L_0886F780:
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_0886F7A8:
+L_0886F7A8: // FUN_0886F7A8: accessibility worker validation stub -> 0 (success)
+    { static bool once=false; if(!once){once=true; std::printf("[HLE] 0886F7A8 accessibility worker validation -> 0\n"); fflush(stdout);} }
+    ctx.gpr[2] = 0u;
+    jump_target = ctx.gpr[31];
+    ctx.pc = jump_target;
+    local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+    return;
+L_0886F7A8_orig_unused:
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-48));
     ctx.gpr[6] = (2u << 16u);
     ctx.gpr[6] = (ctx.gpr[6] + static_cast<std::uint32_t>(-17544));
@@ -25974,7 +25984,15 @@ L_0886FFC4:
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_0886FFD0:
+L_0886FFD0: // FUN_0886FFD0: scesupPreAcc_NID_28C5F696 wrapper stub -> 0
+    { static bool once=false; if(!once){once=true; std::printf("[HLE] 0886FFD0 scesupPreAcc NID_28C5F696 wrapper -> 0\n"); fflush(stdout);} }
+    ctx.gpr[2] = 0u;
+    jump_target = ctx.gpr[31];
+    ctx.pc = jump_target;
+    local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+    return;
+L_0886FFD0_orig_unused:
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-16));
     ctx.gpr[8] = (ctx.gpr[6] | 0u);
     ctx.gpr[6] = (ctx.gpr[4] | 0u);
@@ -26606,6 +26624,13 @@ L_088704D0:
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-16));
     ctx.gpr[4] = (2205u << 16u);
     ctx.gpr[4] = (aot_mem.aot_load8(ctx.gpr[4] + static_cast<std::uint32_t>(24529)));
+    { static int cnt=0; cnt++;
+      if(cnt<=3){
+        std::printf("[704D0 call#%d] DAT_5fd1=%u fd2=%u fd3=%u fd5=%u\n",
+          cnt, ctx.gpr[4],
+          (unsigned)aot_mem.aot_load8((2205u<<16)+24530),
+          (unsigned)aot_mem.aot_load8((2205u<<16)+24531),
+          (unsigned)aot_mem.aot_load8((2205u<<16)+24533)); fflush(stdout);} }
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(0), ctx.gpr[16]);
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(4), ctx.gpr[17]);
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(8), ctx.gpr[31]);
@@ -28111,6 +28136,11 @@ L_088713D0:
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
 L_088713E4:
+    { static int cnt88=0; cnt88++;
+      if(cnt88<=3){ std::printf("[713E4 #%d] mgr=0x%08X +88=0x%08X path_arg=0x%08X\n",
+        cnt88, ctx.gpr[4],
+        ctx.gpr[4] ? (unsigned)aot_mem.aot_load32(ctx.gpr[4]+88) : 0xDEAD,
+        ctx.gpr[5]); fflush(stdout); } }
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-16));
     ctx.gpr[6] = (aot_mem.aot_load32(ctx.gpr[4] + static_cast<std::uint32_t>(88)));
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(0), ctx.gpr[16]);
@@ -38080,6 +38110,7 @@ L_08876F58:
 L_08876F64:
     ctx.gpr[4] = (2205u << 16u);
     aot_mem.aot_store32(ctx.gpr[4] + static_cast<std::uint32_t>(27104), ctx.gpr[16]);
+    std::printf("[769CC] DAT_089D69E0 <- 0x%08X\n", ctx.gpr[16]); fflush(stdout);
     ctx.gpr[6] = (2241u << 16u);
     ctx.gpr[4] = (aot_mem.aot_load32(ctx.gpr[6] + static_cast<std::uint32_t>(14976)));
     ctx.gpr[22] = (aot_mem.aot_load32(ctx.gpr[29] + static_cast<std::uint32_t>(24)));
@@ -53377,6 +53408,7 @@ L_08881F78:
     return;
 L_08881FB8:
     aot_mem.aot_store32(ctx.gpr[17] + static_cast<std::uint32_t>(-9216), ctx.gpr[2]);
+    std::printf("[1F78] FUN_0885C40C returned 0x%08X -> stored at 0x%08X\n", ctx.gpr[2], ctx.gpr[17] - 9216u); fflush(stdout);
     ctx.gpr[4] = (237u << 16u);
     ctx.gpr[17] = (ctx.gpr[16] + ctx.gpr[4]);
     ctx.gpr[5] = (42u << 16u);
@@ -53483,6 +53515,7 @@ L_088820C0:
     ctx.gpr[4] = (ctx.gpr[4] + ctx.gpr[5]);
     jump_target = ctx.gpr[31];
     ctx.gpr[2] = (aot_mem.aot_load32(ctx.gpr[4] + static_cast<std::uint32_t>(-9216)));
+    { static bool once=false; if(!once){once=true; std::printf("[820C0] alloc_ready=0x%08X (ptr=0x%08X)\n", ctx.gpr[2], ctx.gpr[4]); fflush(stdout);} }
     ctx.pc = jump_target;
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
@@ -57313,6 +57346,7 @@ L_08883EE8:
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-16));
     ctx.gpr[4] = (2205u << 16u);
     ctx.gpr[4] = (aot_mem.aot_load32(ctx.gpr[4] + static_cast<std::uint32_t>(27104)));
+    { static int once=0; if(once<3){once++; std::printf("[EE8] DAT_089D69E0=0x%08X\n", ctx.gpr[4]); fflush(stdout);} }
     ctx.gpr[5] = (0u | 1u);
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(0), ctx.gpr[31]);
     ctx.gpr[31] = (0x08883F04u);

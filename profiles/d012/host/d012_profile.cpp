@@ -778,3 +778,8 @@ std::int64_t io_lseek(std::uint32_t fd, std::int64_t offset, std::uint32_t whenc
 }
 
 } // namespace d012
+
+// Exposed for use by generated stubs that need synchronous file I/O
+extern "C" const char* d012_get_game_root() {
+    return d012::g_game_root.c_str();
+}

@@ -4,6 +4,25 @@
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <cstring>
+#include <cstdio>
+
+extern "C" const char* d012_get_game_root();
+
+// Async-open stub: maps path string hash → sequential handle
+static int s_async_seq = 1;
+struct AsyncHandle { char path[128]; int handle; };
+static AsyncHandle s_async_table[64];
+static int s_async_count = 0;
+static int async_register(const char* path) {
+    for(int i=0;i<s_async_count;i++) if(strncmp(s_async_table[i].path,path,127)==0) return s_async_table[i].handle;
+    if(s_async_count<64){ auto& e=s_async_table[s_async_count++]; strncpy(e.path,path,127); e.path[127]=0; e.handle=s_async_seq++; return e.handle; }
+    return s_async_seq++;
+}
+static int async_lookup(const char* path) {
+    for(int i=0;i<s_async_count;i++) if(strncmp(s_async_table[i].path,path,127)==0) return s_async_table[i].handle;
+    return 0;
+}
 
 namespace psprecomp {
 void recomp_unit_0002_entry(Runtime &rt, AllegrexContext &ctx, std::uint16_t direct_entry_id, GuestMemory::AotFastView &aot_mem) {
@@ -52347,7 +52366,49 @@ L_0886282C:
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_08862854:
+L_08862854: // FUN_08862854: set read buffer — lookup handle AND read file into buffer synchronously
+    { char pb[128]{}; if(ctx.gpr[4]){for(int _i=0;_i<127;_i++){uint8_t c=aot_mem.aot_load8(ctx.gpr[4]+_i);pb[_i]=c;if(!c)break;}}
+      int h = async_lookup(pb);
+      uint32_t buf_addr = ctx.gpr[5];
+      uint32_t buf_size = ctx.gpr[6];
+      std::printf("[08862854] set read buf: path='%s' buf=0x%08X size=0x%08X -> handle=%d\n", pb, buf_addr, buf_size, h); fflush(stdout);
+      // Synchronously read the file into the guest buffer
+      if (buf_addr && buf_size && pb[0]) {
+        // Build host path using g_game_root (exposed by d012_profile.cpp)
+        const char* root = d012_get_game_root();
+        char host_path[512];
+        // Strip disc0:/ prefix if present
+        const char* rel = pb;
+        if (strncmp(rel, "disc0:/", 7) == 0) rel += 7;
+        else if (strncmp(rel, "disc0:", 6) == 0) rel += 6;
+        snprintf(host_path, sizeof(host_path), "%s/%s", root, rel);
+        FILE* f = fopen(host_path, "rb");
+        if (f) {
+          uint32_t to_read = buf_size;
+          uint32_t offset = 0;
+          uint8_t tmp[4096];
+          while (to_read > 0) {
+            uint32_t chunk = (to_read > 4096) ? 4096 : to_read;
+            size_t got = fread(tmp, 1, chunk, f);
+            if (got == 0) break;
+            for (uint32_t i = 0; i < (uint32_t)got; i++) aot_mem.aot_store8(buf_addr + offset + i, tmp[i]);
+            offset += (uint32_t)got;
+            to_read -= (uint32_t)got;
+          }
+          fclose(f);
+          std::printf("[08862854] read %u bytes from '%s'\n", offset, host_path); fflush(stdout);
+        } else {
+          std::printf("[08862854] file NOT FOUND: '%s'\n", host_path); fflush(stdout);
+        }
+      }
+      ctx.gpr[2] = (uint32_t)h;
+    }
+    jump_target = ctx.gpr[31];
+    ctx.pc = jump_target;
+    local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+    return;
+L_08862854_orig_unused:
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-32));
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(4), ctx.gpr[17]);
     ctx.gpr[17] = (ctx.gpr[5] | 0u);
@@ -52683,7 +52744,18 @@ L_08862C20:
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_08862C40:
+L_08862C40: // FUN_08862C40: async file open — register path and return handle
+    { char pb[128]{}; if(ctx.gpr[4]){for(int _i=0;_i<127;_i++){uint8_t c=aot_mem.aot_load8(ctx.gpr[4]+_i);pb[_i]=c;if(!c)break;}}
+      int h = async_register(pb);
+      std::printf("[08862C40] async open: path='%s' -> handle=%d\n", pb, h); fflush(stdout);
+      ctx.gpr[2] = (uint32_t)h;
+    }
+    jump_target = ctx.gpr[31];
+    ctx.pc = jump_target;
+    local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+    return;
+L_08862C40_orig_unused:
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-16));
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(0), ctx.gpr[16]);
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(4), ctx.gpr[31]);

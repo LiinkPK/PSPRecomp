@@ -24859,10 +24859,13 @@ L_08933688:
     ctx.gpr[4] = (ctx.gpr[17] | 0u);
     ctx.gpr[31] = (0x08933694u);
     ctx.gpr[5] = (0u | 1u);
+    { char pb[128]{}; if(ctx.gpr[17]){for(int _i=0;_i<127;_i++){uint8_t c=aot_mem.aot_load8(ctx.gpr[17]+_i);pb[_i]=c;if(!c)break;}}
+      std::printf("[354C] archive1 path=0x%08X '%s'\n", ctx.gpr[17], pb); fflush(stdout); }
     if (rt.invoke_chained_direct<&recomp_unit_0002_entry, 2u, 4819u, 0x08862C40u>(ctx, &aot_mem) && ctx.pc == 0x08933694u) goto L_08933694;
     return;
 L_08933694:
     ctx.gpr[19] = (ctx.gpr[2] | 0u);
+    std::printf("[354C] FUN_08862C40 returned 0x%08X (iVar3)\n", ctx.gpr[19]); fflush(stdout);
     { const bool branch_taken = static_cast<std::int32_t>(ctx.gpr[19]) <= 0;
     // nop
       if (branch_taken) {
@@ -24897,6 +24900,7 @@ L_089336B8:
     return;
 L_089336D4:
     ctx.gpr[21] = (ctx.gpr[2] | 0u);
+    std::printf("[354C] FUN_0885C6CC (2MB alloc) returned 0x%08X\n", ctx.gpr[21]); fflush(stdout);
     { const bool branch_taken = ctx.gpr[21] == 0u;
     // nop
       if (branch_taken) {
@@ -24914,6 +24918,7 @@ L_089336E0:
     if (rt.invoke_chained_direct<&recomp_unit_0002_entry, 2u, 4791u, 0x08862854u>(ctx, &aot_mem) && ctx.pc == 0x089336F8u) goto L_089336F8;
     return;
 L_089336F8:
+    std::printf("[354C] FUN_08862854 returned 0x%08X (expected iVar3=0x%08X)\n", ctx.gpr[2], ctx.gpr[19]); fflush(stdout);
     { const bool branch_taken = ctx.gpr[2] != ctx.gpr[19];
     // nop
       if (branch_taken) {
@@ -24933,6 +24938,7 @@ L_08933708:
     if (rt.invoke_chained_direct<&recomp_unit_0003_entry, 3u, 849u, 0x08869954u>(ctx, &aot_mem) && ctx.pc == 0x08933714u) goto L_08933714;
     return;
 L_08933714:
+    std::printf("[354C] FUN_08869954 returned 0x%08X\n", ctx.gpr[2]); fflush(stdout);
     { const bool branch_taken = ctx.gpr[2] == 0u;
     // nop
       if (branch_taken) {

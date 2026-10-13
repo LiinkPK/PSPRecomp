@@ -4808,9 +4808,10 @@ L_089C5D08:
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_089C5D18:
+L_089C5D18: // scesupPreAcc_NID_13AE25B3 - stub returns 0 (accessibility PRX not loaded)
+    { static bool once=false; if(!once){once=true; std::printf("[HLE] scesupPreAcc NID_13AE25B3 -> 0\n"); fflush(stdout);} }
+    ctx.gpr[2] = 0u;
     jump_target = ctx.gpr[31];
-    // nop
     ctx.pc = jump_target;
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
@@ -4822,16 +4823,18 @@ L_089C5D20:
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_089C5D30:
+L_089C5D30: // scesupPreAcc_NID_348BA3E2 - stub returns 0
+    { static bool once=false; if(!once){once=true; std::printf("[HLE] scesupPreAcc NID_348BA3E2 -> 0\n"); fflush(stdout);} }
+    ctx.gpr[2] = 0u;
     jump_target = ctx.gpr[31];
-    // nop
     ctx.pc = jump_target;
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_089C5D38:
+L_089C5D38: // scesupPreAcc_NID_86DEBD66 - stub returns 0
+    { static bool once=false; if(!once){once=true; std::printf("[HLE] scesupPreAcc NID_86DEBD66 -> 0\n"); fflush(stdout);} }
+    ctx.gpr[2] = 0u;
     jump_target = ctx.gpr[31];
-    // nop
     ctx.pc = jump_target;
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
