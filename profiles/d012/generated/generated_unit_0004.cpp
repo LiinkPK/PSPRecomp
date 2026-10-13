@@ -48267,7 +48267,13 @@ L_088A0ED8:
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_088A0EEC:
+L_088A0EEC: // FUN_088A0EEC: audio channel search — stub returns -1 (no channel found, avoids null vtable spin)
+    { static bool once=false; if(!once){once=true; std::printf("[088A0EEC] audio channel search stub -> -1\n"); fflush(stdout);} }
+    ctx.gpr[2] = static_cast<std::uint32_t>(-1);
+    jump_target = ctx.gpr[31]; ctx.pc = jump_target; local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+    return;
+L_088A0EEC_orig_unused:
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-16));
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(0), ctx.gpr[16]);
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(4), ctx.gpr[17]);
@@ -48296,6 +48302,10 @@ L_088A0F18:
     jump_target = ctx.gpr[6];
     ctx.gpr[31] = (0x088A0F40u);
     ctx.gpr[5] = (ctx.gpr[17] + ctx.gpr[5]);
+    if (jump_target == 0u) { // null function pointer in audio slot vtable — return 0 (not found)
+        ctx.gpr[2] = 0u;
+        goto L_088A0F40;
+    }
     ctx.pc = jump_target;
     if (rt.invoke_chained_call(ctx, &aot_mem) && ctx.pc == 0x088A0F40u) goto L_088A0F40;
     return;

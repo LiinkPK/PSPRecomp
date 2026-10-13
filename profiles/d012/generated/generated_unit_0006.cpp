@@ -29663,6 +29663,10 @@ L_088D2A84:
     if (rt.invoke_chained_direct<&recomp_unit_0003_entry, 3u, 876u, 0x08869AB4u>(ctx, &aot_mem) && ctx.pc == 0x088D2A8Cu) goto L_088D2A8C;
     return;
 L_088D2A8C:
+    if (ctx.gpr[2] == 0u) { // FUN_08869AB4 returned null - go to "not found" path
+        { static bool once=false; if(!once){once=true; std::printf("[088D2A8C] FUN_08869AB4 returned null, taking not-found path\n"); fflush(stdout);} }
+        goto L_088D2AA0;
+    }
     ctx.gpr[23] = (aot_mem.aot_load32(ctx.gpr[2] + static_cast<std::uint32_t>(4)));
     ctx.gpr[5] = (aot_mem.aot_load32(ctx.gpr[29] + static_cast<std::uint32_t>(80)));
     ctx.gpr[18] = (ctx.gpr[23] + static_cast<std::uint32_t>(16));

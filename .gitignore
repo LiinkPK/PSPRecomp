@@ -33,6 +33,7 @@ SAVEDATA/
 /profiles/*/analysis/
 /profiles/*/progress/
 /profiles/*/captures/
+/original
 
 # Generated scratch output (the checked-in profile corpus is not ignored)
 *.generated

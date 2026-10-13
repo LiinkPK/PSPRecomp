@@ -1,6 +1,6 @@
 # PSPRecomp – Dissidia 012 (ULES01505.BIN) – Current State
 
-**Last updated:** 2026-10-13
+**Last updated:** 13/10/2026
 
 **Goal:** Get the recompiled game to reach its main loop and eventually show a black screen window.
 
