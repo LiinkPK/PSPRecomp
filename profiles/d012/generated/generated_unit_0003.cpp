@@ -53749,6 +53749,59 @@ L_0888223C:
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
 L_08882250:
+    // ARCH-SYNTH: init pool → set rman+1808 → set rman+116 per-frame
+    { static std::uint32_t s_arch_frame = 0u;
+      ++s_arch_frame;
+      const std::uint32_t rman_ptr  = aot_mem.aot_load32((2205u<<16u) + 27336u);
+      const std::uint32_t rbuf_list = aot_mem.aot_load32((2205u<<16u) + 24468u);
+      // Step 1: force first render buffer entry's avail to 1 (GE completion stub)
+      if (rbuf_list != 0u) {
+          const std::uint32_t first_entry = rbuf_list + 28u;
+          const std::uint32_t avail_addr  = first_entry + 12u;
+          if (aot_mem.aot_load32(avail_addr) == 0u) {
+              aot_mem.aot_store32(avail_addr, 1u);
+              std::printf("[ARCH-SYNTH] forced rbuf[0].avail=1 at 0x%08X\n", avail_addr);
+              std::fflush(stdout);
+          }
+      }
+      if (rman_ptr != 0u) {
+          const std::uint32_t saved_a0=ctx.gpr[4], saved_a1=ctx.gpr[5], saved_a2=ctx.gpr[6];
+          const std::uint32_t saved_a3=ctx.gpr[7], saved_ra=ctx.gpr[31], saved_pc=ctx.pc;
+          const std::uint32_t saved_s0=ctx.gpr[16], saved_s1=ctx.gpr[17], saved_s2=ctx.gpr[18];
+          const std::uint32_t saved_s3=ctx.gpr[19], saved_s4=ctx.gpr[20], saved_s5=ctx.gpr[21];
+          const std::uint32_t saved_s6=ctx.gpr[22], saved_s7=ctx.gpr[23];
+          // Step 2: directly force rman+1808 to a zeroed 512-byte scratch region.
+          // FUN_0889381C returns rman+1808+32. FUN_08893418 then uses that as a render-state
+          // struct at offsets +0,+8,+10,+12 etc. Zeroing the region is safe: the code checks
+          // field+0 and field+8 values to decide what to do next.
+          static constexpr std::uint32_t FAKE_RSTATE = 0x09FE1100u;
+          if (aot_mem.aot_load32(rman_ptr + 1808u) == 0u) {
+              for (std::uint32_t i = 0u; i < 512u; i += 4u)
+                  aot_mem.aot_store32(FAKE_RSTATE + i, 0u);
+              aot_mem.aot_store32(rman_ptr + 1808u, FAKE_RSTATE);
+              if (s_arch_frame <= 3u) { std::printf("[ARCH-SYNTH#%u] forced rman+1808=0x%08X\n", s_arch_frame, FAKE_RSTATE); std::fflush(stdout); }
+          }
+          // Step 3: call FUN_08893FF4 directly (bypasses FUN_08893418→FUN_08892940 crash chain)
+          // FUN_08893FF4 calls FUN_0889381C(rman)→rman+1808+32, then FUN_0886D2C4 to find
+          // an available render buffer, and stores it to rman+116.
+          // Args: a4=rman, a5=0, a6=(2229<<16)+14384, a7=0, t0=0
+          if (aot_mem.aot_load32(rman_ptr + 116u) == 0u
+              && aot_mem.aot_load32(rman_ptr + 1808u) != 0u) {
+              ctx.gpr[4] = rman_ptr; ctx.gpr[5] = 0u;
+              ctx.gpr[6] = (2229u<<16u) + 14384u; ctx.gpr[7] = 0u;
+              ctx.gpr[8] = 0u; // t0=a3&0xFF=0
+              ctx.gpr[31] = 0x08882250u; ctx.pc = 0x08893FF4u;
+              if (s_arch_frame <= 3u) { std::printf("[ARCH-SYNTH#%u] calling FUN_08893FF4(rman=0x%08X) rman+1808=0x%08X\n", s_arch_frame, rman_ptr, aot_mem.aot_load32(rman_ptr+1808u)); std::fflush(stdout); }
+              rt.invoke_chained_direct<&recomp_unit_0004_entry, 4u, 2803u, 0x08893FF4u>(ctx, &aot_mem);
+              if (s_arch_frame <= 3u) { std::printf("[ARCH-SYNTH#%u] after FUN_08893FF4, rman+116=0x%08X\n", s_arch_frame, aot_mem.aot_load32(rman_ptr+116u)); std::fflush(stdout); }
+          }
+          ctx.gpr[4]=saved_a0; ctx.gpr[5]=saved_a1; ctx.gpr[6]=saved_a2;
+          ctx.gpr[7]=saved_a3; ctx.gpr[31]=saved_ra; ctx.pc=saved_pc;
+          ctx.gpr[16]=saved_s0; ctx.gpr[17]=saved_s1; ctx.gpr[18]=saved_s2;
+          ctx.gpr[19]=saved_s3; ctx.gpr[20]=saved_s4; ctx.gpr[21]=saved_s5;
+          ctx.gpr[22]=saved_s6; ctx.gpr[23]=saved_s7;
+      }
+    }
     { static std::uint32_t s_sched_call = 0u;
       ++s_sched_call;
       if (s_sched_call <= 10u || (s_sched_call & 0xFFFFu) == 0u) {

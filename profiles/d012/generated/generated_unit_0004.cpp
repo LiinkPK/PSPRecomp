@@ -32719,12 +32719,15 @@ L_08897130:
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
 L_08897138:
+    { static int s_8138=0; if(s_8138<3){s_8138++; std::printf("[FN-8897138] pool_mgr=0x%08X a1(size)=0x%08X\n", ctx.gpr[4], ctx.gpr[5]); std::fflush(stdout);} }
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-16));
     ctx.gpr[6] = (aot_mem.aot_load32(ctx.gpr[4] + static_cast<std::uint32_t>(0)));
+    { static int s_8138b=0; if(s_8138b<3){s_8138b++; std::printf("[FN-8897138] pool_mgr+0=0x%08X (sub_ptr), a1=0x%08X\n", ctx.gpr[6], ctx.gpr[5]); std::fflush(stdout);} }
     ctx.gpr[4] = (ctx.gpr[5] | 0u);
     ctx.gpr[5] = (ctx.gpr[6] + static_cast<std::uint32_t>(8));
     ctx.gpr[8] = (2185u << 16u);
     ctx.gpr[6] = (aot_mem.aot_load32(ctx.gpr[6] + static_cast<std::uint32_t>(4)));
+    { static int s_8138c=0; if(s_8138c<3){s_8138c++; std::printf("[FN-8897138] sub_ptr+4=0x%08X (freelist?)\n", ctx.gpr[6]); std::fflush(stdout);} }
     ctx.gpr[7] = (0u | 92u);
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(0), ctx.gpr[31]);
     ctx.gpr[31] = (0x08897160u);

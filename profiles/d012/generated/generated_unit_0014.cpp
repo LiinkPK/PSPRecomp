@@ -4321,7 +4321,7 @@ L_089C5AC0: // sceDisplaySetFrameBuf(buf, bufWidth, pixelFormat, sync)
           const std::size_t vram_off = buf_va - 0x04000000u;
           const auto &vram = rt.memory().vram_bytes();
           if (vram_off < vram.size()) {
-              // Diagnostic: count non-zero pixels in the first 480x272 RGBA8888 region
+              // Diagnostic: count non-zero pixels — check display buffer AND back buffer (offset 0)
               { static std::uint32_t s_frame_diag = 0;
                 if (++s_frame_diag <= 5u) {
                     std::uint32_t nz = 0;
@@ -4329,8 +4329,15 @@ L_089C5AC0: // sceDisplaySetFrameBuf(buf, bufWidth, pixelFormat, sync)
                     const std::size_t total = std::min(vram.size() - vram_off, std::size_t(480*272*4));
                     for (std::size_t i = 0; i < total; i += 4)
                         if (px[i]|px[i+1]|px[i+2]|px[i+3]) ++nz;
-                    std::printf("[display] frame %u: vram_off=0x%zX non_zero_pixels=%u fmt=%u w=%u\n",
-                                s_frame_diag, vram_off, nz, fmt, buf_w);
+                    // Also check back buffer at EDRAM offset 0 (GE fbp=0 renders here)
+                    std::uint32_t nz_bb = 0;
+                    if (vram.size() >= std::size_t(480*272*4)) {
+                        const std::uint8_t *bb = vram.data();
+                        for (std::size_t i = 0; i < std::size_t(480*272*4); i += 4)
+                            if (bb[i]|bb[i+1]|bb[i+2]|bb[i+3]) ++nz_bb;
+                    }
+                    std::printf("[display] frame %u: vram_off=0x%zX non_zero_pixels=%u nz_backbuf=%u fmt=%u w=%u\n",
+                                s_frame_diag, vram_off, nz, nz_bb, fmt, buf_w);
                 }
               }
               d012::display_present(vram.data() + vram_off,
