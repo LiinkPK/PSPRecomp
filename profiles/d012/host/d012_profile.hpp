@@ -26,6 +26,10 @@ extern std::string g_game_root;
 extern std::uint32_t g_jump_table_snapshot[12];
 extern bool          g_jump_table_snapshot_valid;
 
+// Callback table snapshot: 16 entries at 0x089C96B0, same post-INIT corruption issue.
+extern std::uint32_t g_cb_table_snapshot[16];
+extern bool          g_cb_table_snapshot_valid;
+
 // File I/O state — used from generated_unit_0014.cpp
 std::uint32_t io_open(const std::string &psp_path, std::uint32_t flags);
 std::int32_t  io_read(std::uint32_t fd, void *buf, std::uint32_t size);

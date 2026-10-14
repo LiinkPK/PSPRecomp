@@ -490,6 +490,21 @@ LOCAL_DISPATCH:
     case 0x088E5C50u: goto L_088E5C50;
     case 0x088E5C60u: goto L_088E5C60;
     case 0x088E5C74u: goto L_088E5C74;
+    // ARCH-SYNTH: stubs for callback table functions 0x088E5FD0-0x088E6634 (gap between unit coverage)
+    case 0x088E5FD0u: goto L_088E5FD0;
+    case 0x088E5FF0u: goto L_088E5FF0;
+    case 0x088E6024u: goto L_088E6024;
+    case 0x088E6044u: goto L_088E6044;
+    case 0x088E6098u: goto L_088E6098;
+    case 0x088E6170u: goto L_088E6170;
+    case 0x088E61ACu: goto L_088E61AC;
+    case 0x088E62A0u: goto L_088E62A0;
+    case 0x088E62C8u: goto L_088E62C8;
+    case 0x088E62F0u: goto L_088E62F0;
+    case 0x088E6300u: goto L_088E6300;
+    case 0x088E6310u: goto L_088E6310;
+    case 0x088E64A0u: goto L_088E64A0;
+    case 0x088E6634u: goto L_088E6634;
     case 0x088E6658u: goto L_088E6658;
     case 0x088E6678u: goto L_088E6678;
     case 0x088E66A0u: goto L_088E66A0;
@@ -9715,6 +9730,30 @@ L_088E5C74:
     ctx.gpr[1] = (aot_mem.aot_load32(ctx.gpr[1] + static_cast<std::uint32_t>(-14792)));
     jump_target = ctx.gpr[1];
     // nop
+    ctx.pc = jump_target;
+    local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+    return;
+// ARCH-SYNTH: stubs for callback table functions in gap 0x088E5FD0-0x088E6634.
+// These are render-object callback functions; return 1 (success) so FUN_08872F08
+// sets bit2 of flags and proceeds with the render chain.
+L_088E5FD0:
+L_088E5FF0:
+L_088E6024:
+L_088E6044:
+L_088E6098:
+L_088E6170:
+L_088E61AC:
+L_088E62A0:
+L_088E62C8:
+L_088E62F0:
+L_088E6300:
+L_088E6310:
+L_088E64A0:
+L_088E6634:
+    { static int s_cb_stub_count = 0; if (s_cb_stub_count < 5) { ++s_cb_stub_count; std::printf("[CB-STUB] pc=0x%08X a0=0x%08X ra=0x%08X\n", ctx.pc, ctx.gpr[4], ctx.gpr[31]); fflush(stdout); } }
+    ctx.gpr[2] = 1u;
+    jump_target = ctx.gpr[31];
     ctx.pc = jump_target;
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
@@ -64137,5 +64176,20 @@ void register_generated_unit_7(Runtime &runtime) {
     runtime.register_function(0x08904028u, &recomp_unit_0007, "recomp_unit_0007");
     runtime.register_function(0x0890402Cu, &recomp_unit_0007, "recomp_unit_0007");
     runtime.register_function(0x08904038u, &recomp_unit_0007, "recomp_unit_0007");
+    // ARCH-SYNTH: register callback table stubs (gap 0x088E5FD0-0x088E6634)
+    runtime.register_function(0x088E5FD0u, &recomp_unit_0007, "recomp_unit_0007");
+    runtime.register_function(0x088E5FF0u, &recomp_unit_0007, "recomp_unit_0007");
+    runtime.register_function(0x088E6024u, &recomp_unit_0007, "recomp_unit_0007");
+    runtime.register_function(0x088E6044u, &recomp_unit_0007, "recomp_unit_0007");
+    runtime.register_function(0x088E6098u, &recomp_unit_0007, "recomp_unit_0007");
+    runtime.register_function(0x088E6170u, &recomp_unit_0007, "recomp_unit_0007");
+    runtime.register_function(0x088E61ACu, &recomp_unit_0007, "recomp_unit_0007");
+    runtime.register_function(0x088E62A0u, &recomp_unit_0007, "recomp_unit_0007");
+    runtime.register_function(0x088E62C8u, &recomp_unit_0007, "recomp_unit_0007");
+    runtime.register_function(0x088E62F0u, &recomp_unit_0007, "recomp_unit_0007");
+    runtime.register_function(0x088E6300u, &recomp_unit_0007, "recomp_unit_0007");
+    runtime.register_function(0x088E6310u, &recomp_unit_0007, "recomp_unit_0007");
+    runtime.register_function(0x088E64A0u, &recomp_unit_0007, "recomp_unit_0007");
+    runtime.register_function(0x088E6634u, &recomp_unit_0007, "recomp_unit_0007");
 }
 } // namespace psprecomp

@@ -25282,6 +25282,7 @@ L_089AD1E4:
     ctx.gpr[7] = (0u + static_cast<std::uint32_t>(208));
     goto L_089ABAE8;
 L_089AD204:
+    { static int s_ins=0; if(s_ins<5){s_ins++; std::printf("[RCHAIN-INSERT] FUN_089AD204 called a0=0x%08X a0+8=0x%08X\n", ctx.gpr[4], aot_mem.aot_load32(ctx.gpr[4]+8u)); fflush(stdout);} }
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-16));
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(0), ctx.gpr[16]);
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(4), ctx.gpr[31]);
@@ -25367,6 +25368,7 @@ L_089AD2C0:
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
 L_089AD2D0:
+    { static int s_d0=0; if(s_d0<5){s_d0++; std::printf("[RCHAIN-DISP] FUN_089AD2D0 called a0=0x%08X a1=0x%08X a0+8=0x%08X\n", ctx.gpr[4], ctx.gpr[5], aot_mem.aot_load32(ctx.gpr[4]+8u)); fflush(stdout);} }
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-16));
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(4), ctx.gpr[17]);
     ctx.gpr[17] = (ctx.gpr[4] + 0u);

@@ -1,5 +1,6 @@
 ﻿#include "psprecomp/runtime.hpp"
 #include "generated_units.hpp"
+#include "../host/d012_profile.hpp"
 #include <bit>
 #include <cmath>
 #include <cstdint>
@@ -7379,6 +7380,7 @@ L_0886598C:
       goto L_088659BC;
     }
 L_088659BC:
+    { static bool once=false; if(!once){once=true; std::printf("[SCENE-INIT] Starting scene init, obj=0x%08X byte11470=%u int2240=0x%08X\n", ctx.gpr[16], aot_mem.aot_load8(ctx.gpr[16]+11470u), aot_mem.aot_load32(ctx.gpr[16]+2240u)); fflush(stdout); } }
     ctx.gpr[4] = (aot_mem.aot_load32(ctx.gpr[16] + static_cast<std::uint32_t>(2240)));
     ctx.gpr[5] = (0u | 1u);
     ctx.gpr[4] = (ctx.gpr[4] < static_cast<std::uint32_t>(1) ? 1u : 0u);
@@ -7395,6 +7397,7 @@ L_088659BC:
     if (rt.invoke_chained_direct<&recomp_unit_0012_entry, 12u, 4436u, 0x0899F5A4u>(ctx, &aot_mem) && ctx.pc == 0x088659F0u) goto L_088659F0;
     return;
 L_088659F0:
+    { static bool once=false; if(!once){once=true; std::printf("[SCENE-INIT] First scene init call (0x0899F5A4) returned OK\n"); fflush(stdout); } }
     ctx.gpr[31] = (0x088659F8u);
     ctx.gpr[4] = (ctx.gpr[16] | 0u);
     goto L_08866AE0;
@@ -7850,6 +7853,7 @@ L_08865E24:
     if (rt.invoke_chained_direct<&recomp_unit_0012_entry, 12u, 4813u, 0x089A25C0u>(ctx, &aot_mem) && ctx.pc == 0x08865E2Cu) goto L_08865E2C;
     return;
 L_08865E2C:
+    { static bool once=false; if(!once){once=true; std::printf("[SCENE-INIT] Scene init sequence COMPLETED (reached epilogue)\n"); fflush(stdout); } }
     ctx.fpr[20] = std::bit_cast<float>(aot_mem.aot_load32(ctx.gpr[29] + static_cast<std::uint32_t>(400)));
     ctx.fpr[22] = std::bit_cast<float>(aot_mem.aot_load32(ctx.gpr[29] + static_cast<std::uint32_t>(404)));
     ctx.fpr[24] = std::bit_cast<float>(aot_mem.aot_load32(ctx.gpr[29] + static_cast<std::uint32_t>(408)));
@@ -30960,6 +30964,34 @@ L_08872F08:
     ctx.gpr[4] = (2205u << 16u);
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(0), ctx.gpr[16]);
     ctx.gpr[16] = (aot_mem.aot_load32(ctx.gpr[4] + static_cast<std::uint32_t>(24584)));
+    // ARCH-SYNTH: restore callback table at 0x089C96B0. The C-runtime data-init copy
+    // overwrites this with raw ELF file values (e.g. 0x002E795A) instead of the correct
+    // function pointers from the ROM. Values taken directly from ULES01505_FFSTJP.BIN.
+    { constexpr std::uint32_t CB_BASE = 0x089C96B0u;
+      std::uint32_t cb3 = aot_mem.aot_load32(CB_BASE + 12u);
+      if (cb3 < 0x08800000u || cb3 >= 0x09F00000u) {
+          static const std::uint32_t k_cb_table[14] = {
+              0x088E62A0u, 0x088E62C8u, 0x088E62F0u, 0x088E6300u,
+              0x088E5FD0u, 0x088E5FF0u, 0x088E6024u, 0x088E6044u,
+              0x088E6310u, 0x088E64A0u, 0x088E6634u, 0x088E6170u,
+              0x088E61ACu, 0x088E6098u
+          };
+          static bool once=false; if(!once){once=true;
+              std::printf("[CB-RESTORE] Restoring callback table (cb[3] was 0x%08X -> 0x%08X)\n",
+                  cb3, k_cb_table[3]); fflush(stdout);}
+          for (int i = 0; i < 14; ++i)
+              aot_mem.aot_store32(CB_BASE + static_cast<std::uint32_t>(i*4), k_cb_table[i]);
+          aot_mem.aot_store32(CB_BASE + 56u, 0u);
+          aot_mem.aot_store32(CB_BASE + 60u, 0u);
+      }
+    }
+    { static bool once=false; if(!once){once=true;
+        std::uint32_t obj=ctx.gpr[16];
+        std::uint32_t sub=aot_mem.aot_load32(obj+52u);
+        std::uint32_t fn=aot_mem.aot_load32(sub+12u);
+        std::printf("[08872F08] obj=0x%08X sub(obj+52)=0x%08X fn(sub+12)=0x%08X\n",obj,sub,fn);
+        fflush(stdout);
+    }}
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(4), ctx.gpr[31]);
     ctx.gpr[31] = (0x08872F24u);
     ctx.gpr[4] = (ctx.gpr[16] | 0u);
@@ -30986,7 +31018,7 @@ L_08872F34:
     ctx.gpr[31] = (0x08872F60u);
     ctx.gpr[6] = (ctx.gpr[8] | 0u);
     if (jump_target < 0x08800000u || jump_target >= 0x09F00000u) {
-        std::printf("[08872F2C] bad jump_target=0x%08X (fn ptr at gpr16+52+12), skipping call ra=0x%08X\n", jump_target, ctx.gpr[31]); fflush(stdout);
+        { static std::uint32_t cnt=0; if(++cnt<=3u) { std::printf("[08872F2C] bad jump_target=0x%08X (fn ptr at gpr16+52+12), skipping call ra=0x%08X\n", jump_target, ctx.gpr[31]); fflush(stdout); } }
         ctx.gpr[2] = 0u;
         goto L_08872F60;
     }
@@ -39262,6 +39294,7 @@ L_08877848:
     if (rt.invoke_chained_direct<&recomp_unit_0012_entry, 12u, 2080u, 0x08992F6Cu>(ctx, &aot_mem) && ctx.pc == 0x08877854u) goto L_08877854;
     return;
 L_08877854:
+    { std::printf("[RMAN-INIT] storing render_mgr=0x%08X at 0x089D6AC8\n", ctx.gpr[20]); fflush(stdout); }
     ctx.gpr[4] = (2205u << 16u);
     aot_mem.aot_store32(ctx.gpr[4] + static_cast<std::uint32_t>(27336), ctx.gpr[20]);
     ctx.gpr[6] = (2234u << 16u);
@@ -53723,7 +53756,9 @@ L_08882250:
           const std::uint32_t list  = aot_mem.aot_load32(ts + 8192u);
           const std::uint32_t mask  = aot_mem.aot_load32(ts + 8196u);
           const std::uint32_t val   = aot_mem.aot_load32(ts + 8200u);
-          std::printf("[SCHED#%u] list=0x%08X mask=0x%08X val=0x%08X\n", s_sched_call, list, mask, val);
+          const std::uint32_t rman  = aot_mem.aot_load32((2205u<<16u)+27336u);
+          const std::uint32_t rman2 = aot_mem.aot_load32((2205u<<16u)+27152u);
+          std::printf("[SCHED#%u] list=0x%08X rman=0x%08X f116=0x%08X rman2=0x%08X f116_2=0x%08X\n", s_sched_call, list, rman, rman?aot_mem.aot_load32(rman+116u):0u, rman2, rman2?aot_mem.aot_load32(rman2+116u):0u);
           // Print tasks and their dispatch eligibility
           if (list) {
               std::uint32_t tp = aot_mem.aot_load32(list + 4u);

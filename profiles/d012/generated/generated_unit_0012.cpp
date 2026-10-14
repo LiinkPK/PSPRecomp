@@ -29398,7 +29398,18 @@ L_0899321C:
           for (int _i = 0; _i < 12; ++_i)
               d012::g_jump_table_snapshot[_i] = aot_mem.aot_load32(0x089C89C0u + static_cast<std::uint32_t>(_i*4));
           d012::g_jump_table_snapshot_valid = true;
-          printf("[INIT-SNAP] Saved jump table before fn=0x%08X, entry[0]=0x%08X\n", jump_target, tbl0_before); fflush(stdout);
+          printf("[INIT-SNAP] Saved jump table before fn=0x%08X, entry[0]=0x%08X\n", jump_target, tbl0_before);
+          for (int _p = 0; _p < 12; ++_p) printf("  jt[%2d]=0x%08X\n", _p, d012::g_jump_table_snapshot[_p]);
+          fflush(stdout);
+      }
+      // Also snapshot the callback table at 0x089C96B0 (same corruption window).
+      if (!d012::g_cb_table_snapshot_valid) {
+          std::uint32_t cb0 = aot_mem.aot_load32(0x089C96B0u);
+          if (cb0 >= 0x08800000u && cb0 < 0x09F00000u) {
+              for (int _i = 0; _i < 16; ++_i)
+                  d012::g_cb_table_snapshot[_i] = aot_mem.aot_load32(0x089C96B0u + static_cast<std::uint32_t>(_i*4));
+              d012::g_cb_table_snapshot_valid = true;
+          }
       }
       printf("[INIT] calling function pointer 0x%08X (table[0]=0x%08X)\n", jump_target, tbl0_before); fflush(stdout);
       if (rt.invoke_chained_call(ctx, &aot_mem) && ctx.pc == 0x08993224u) {
@@ -29432,6 +29443,16 @@ L_08993234:
           printf("[INIT-DONE] Saved jump table, entry[0]=0x%08X, returning to 0x%08X\n", tbl0, jump_target);
       } else {
           printf("[INIT-DONE] WARNING: table already corrupt at INIT-DONE! table[0]=0x%08X\n", tbl0);
+      }
+      // Also snapshot callback table at INIT-DONE.
+      if (!d012::g_cb_table_snapshot_valid) {
+          std::uint32_t cb0 = aot_mem.aot_load32(0x089C96B0u);
+          if (cb0 >= 0x08800000u && cb0 < 0x09F00000u) {
+              for (int i = 0; i < 16; ++i)
+                  d012::g_cb_table_snapshot[i] = aot_mem.aot_load32(0x089C96B0u + static_cast<std::uint32_t>(i*4));
+              d012::g_cb_table_snapshot_valid = true;
+              printf("[INIT-DONE] Saved callback table, entry[3]=0x%08X\n", d012::g_cb_table_snapshot[3]);
+          }
       }
       fflush(stdout); }
     ctx.pc = jump_target;

@@ -25,6 +25,10 @@ std::string g_game_root;
 std::uint32_t g_jump_table_snapshot[12] = {};
 bool          g_jump_table_snapshot_valid = false;
 
+// Callback table snapshot (0x089C96B0, 16 entries) — same corruption
+std::uint32_t g_cb_table_snapshot[16] = {};
+bool          g_cb_table_snapshot_valid = false;
+
 namespace {
 
 // Per-VA dispatch table populated before the first run

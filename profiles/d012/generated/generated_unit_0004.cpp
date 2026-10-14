@@ -13286,6 +13286,7 @@ L_08889070:
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
 L_08889098:
+    { static int s_90=0; if(s_90<3){s_90++; std::printf("[FN-08889098] called ra=0x%08X\n", ctx.gpr[31]); fflush(stdout);} }
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-16));
     ctx.gpr[4] = (2205u << 16u);
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(0), ctx.gpr[31]);
@@ -17536,6 +17537,7 @@ L_0888C010:
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
 L_0888C4C8:
+    { static int s_c4=0; if(s_c4<3){s_c4++; std::printf("[FN-0888C4C8] called a0=0x%08X ra=0x%08X\n", ctx.gpr[4], ctx.gpr[31]); fflush(stdout);} }
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-4224));
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(4208), ctx.gpr[22]);
     ctx.gpr[22] = (ctx.gpr[4] | 0u);
@@ -25205,6 +25207,7 @@ L_08891D74:
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
 L_08892198:
+    { static int s_ri=0; if(s_ri<2){s_ri++; std::printf("[RMAN-CTOR] FUN_08892198 called a0=0x%08X\n", ctx.gpr[4]); fflush(stdout);} }
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-16));
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(0), ctx.gpr[16]);
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(4), ctx.gpr[31]);
@@ -25260,6 +25263,7 @@ L_08892204:
 L_088922C8:
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-48));
     ctx.gpr[5] = (aot_mem.aot_load8(ctx.gpr[4] + static_cast<std::uint32_t>(1744)));
+    { static int s_rc=0; if(s_rc<5){s_rc++; std::printf("[RCOBJ] L_088922C8 a0=0x%08X byte1744=%u\n", ctx.gpr[4], ctx.gpr[5]); fflush(stdout);} }
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(16), ctx.gpr[16]);
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(20), ctx.gpr[17]);
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(24), ctx.gpr[18]);
@@ -27149,6 +27153,7 @@ L_08893400:
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
 L_08893418:
+    { static int s_418=0; if(s_418<3){s_418++; std::printf("[SETUP-118] FUN_08893418 called a0=0x%08X a1=0x%08X a2=0x%08X a3=0x%08X\n", ctx.gpr[4], ctx.gpr[5], ctx.gpr[6], ctx.gpr[7]); fflush(stdout);} }
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-96));
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(64), ctx.gpr[16]);
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(68), ctx.gpr[17]);
@@ -27163,6 +27168,7 @@ L_08893418:
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(84), ctx.gpr[31]);
     ctx.gpr[31] = (0x08893450u);
     ctx.gpr[4] = (aot_mem.aot_load32(ctx.gpr[18] + static_cast<std::uint32_t>(27336)));
+    { static int s_cf8=0; if(s_cf8<3){s_cf8++; std::printf("[CF8-GATE] global_obj=0x%08X field+1808=0x%08X\n", ctx.gpr[4], aot_mem.aot_load32(ctx.gpr[4]+1808u)); fflush(stdout);} }
     goto L_08893CF8;
 L_08893450:
     ctx.gpr[31] = (0x08893458u);
@@ -27248,6 +27254,7 @@ L_08893558:
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(0), ctx.gpr[16]);
     ctx.gpr[16] = (aot_mem.aot_load32(ctx.gpr[4] + static_cast<std::uint32_t>(27336)));
     ctx.gpr[4] = (aot_mem.aot_load32(ctx.gpr[16] + static_cast<std::uint32_t>(116)));
+    { static int s_558=0; if(s_558<5){s_558++; std::printf("[RGATE] FUN_08893558: global_obj=0x%08X field+116=0x%08X\n", ctx.gpr[16], ctx.gpr[4]); fflush(stdout);} }
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(4), ctx.gpr[31]);
     { const bool branch_taken = ctx.gpr[4] == 0u;
     // nop
@@ -28459,6 +28466,7 @@ L_0889404C:
     if (rt.invoke_chained_direct<&recomp_unit_0003_entry, 3u, 1674u, 0x0886D2C4u>(ctx, &aot_mem) && ctx.pc == 0x0889405Cu) goto L_0889405C;
     return;
 L_0889405C:
+    { std::printf("[FIELD116-SET] obj=0x%08X field+116=0x%08X\n", ctx.gpr[21], ctx.gpr[2]); fflush(stdout); }
     aot_mem.aot_store32(ctx.gpr[21] + static_cast<std::uint32_t>(116), ctx.gpr[2]);
     ctx.gpr[31] = (0x08894068u);
     ctx.gpr[4] = (ctx.gpr[2] | 0u);
@@ -49981,6 +49989,7 @@ L_088A20CC:
     ctx.gpr[5] = (2205u << 16u);
     ctx.gpr[4] = (aot_mem.aot_load32(ctx.gpr[5] + static_cast<std::uint32_t>(27792)));
     ctx.gpr[2] = (aot_mem.aot_load32(ctx.gpr[4] + static_cast<std::uint32_t>(6144)));
+    { static int s_dl=0; if(s_dl<3){s_dl++; std::printf("[DL-POOL] dl_pool_ptr=0x%08X count=%d\n", ctx.gpr[4], (int)ctx.gpr[2]); fflush(stdout);} }
     { const bool branch_taken = static_cast<std::int32_t>(ctx.gpr[2]) <= 0;
     ctx.gpr[6] = (ctx.gpr[2] + static_cast<std::uint32_t>(-1));
       if (branch_taken) {
@@ -50498,6 +50507,14 @@ L_088A24D4:
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-32));
     ctx.gpr[8] = (2205u << 16u);
     ctx.gpr[8] = (aot_mem.aot_load8(ctx.gpr[8] + static_cast<std::uint32_t>(27800)));
+    // ARCH-SYNTH: byte[0x089D6C98] is a pool-ready flag set during INIT that our
+    // init_funcs don't cover (the pool-setup call chain ends before writing it).
+    // Force it to 1 here so FUN_088A24D4 can allocate render objects.
+    if (ctx.gpr[8] == 0u) {
+        { static bool once=false; if(!once){once=true; std::printf("[ARCH-SYNTH] forcing byte[0x089D6C98]=1 (pool-ready gate)\n"); fflush(stdout);} }
+        aot_mem.aot_store8((2205u << 16u) + 27800u, 1u);
+        ctx.gpr[8] = 1u;
+    }
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(4), ctx.gpr[17]);
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(8), ctx.gpr[18]);
     ctx.gpr[18] = (ctx.gpr[4] | 0u);
@@ -50517,6 +50534,7 @@ L_088A24D4:
 L_088A250C:
     ctx.gpr[4] = (2485u << 16u);
     ctx.gpr[4] = (aot_mem.aot_load32(ctx.gpr[4] + static_cast<std::uint32_t>(-11616)));
+    { static int s_pool=0; if(s_pool<3){s_pool++; std::printf("[POOL] pool_ptr=0x%08X count=%d\n", ctx.gpr[4], (int)aot_mem.aot_load32(ctx.gpr[4]+1536u)); fflush(stdout);} }
     ctx.gpr[4] = (aot_mem.aot_load32(ctx.gpr[4] + static_cast<std::uint32_t>(1536)));
     { const bool branch_taken = static_cast<std::int32_t>(ctx.gpr[4]) <= 0;
     ctx.gpr[19] = (0u | 0u);
@@ -50579,6 +50597,7 @@ L_088A257C:
       goto L_088A2584;
     }
 L_088A2584:
+    { static int s_obj=0; if(s_obj<3){s_obj++; std::printf("[OBJ-ALLOC] allocated render obj=0x%08X a0=0x%08X a1=0x%08X\n", ctx.gpr[19], ctx.gpr[18], ctx.gpr[17]); fflush(stdout);} }
     ctx.gpr[20] = (0u | 0u);
     ctx.gpr[31] = (0x088A2590u);
     ctx.gpr[4] = (0u | 92u);
@@ -50641,6 +50660,7 @@ L_088A25D8:
     ctx.gpr[4] = (ctx.gpr[4] + static_cast<std::uint32_t>(8));
     ctx.gpr[6] = (static_cast<std::uint32_t>(static_cast<std::int32_t>(static_cast<std::int16_t>(aot_mem.aot_load16(ctx.gpr[4] + static_cast<std::uint32_t>(0))))));
     ctx.gpr[7] = (aot_mem.aot_load32(ctx.gpr[4] + static_cast<std::uint32_t>(4)));
+    { static int s_vt=0; if(s_vt<3){s_vt++; std::printf("[VTABLE-3] obj=0x%08X vtbl=0x%08X vtbl+8=0x%08X fn=0x%08X offset=%d\n", ctx.gpr[19], aot_mem.aot_load32(ctx.gpr[19]), ctx.gpr[4]-8u, ctx.gpr[7], (int)ctx.gpr[6]); fflush(stdout);} }
     jump_target = ctx.gpr[7];
     ctx.gpr[31] = (0x088A25F4u);
     ctx.gpr[4] = (ctx.gpr[19] + ctx.gpr[6]);

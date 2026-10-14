@@ -692,6 +692,18 @@ LOCAL_DISPATCH:
     case 0x08846A18u: goto L_08846A18;
     case 0x08846A3Cu: goto L_08846A3C;
     case 0x08846A60u: goto L_08846A60;
+    // ARCH-SYNTH: stubs for jump table functions installed at 0x089C89C0 by INIT (gap not compiled by recompiler)
+    case 0x08846A78u: goto L_08846A78;
+    case 0x08846A98u: goto L_08846A98;
+    case 0x08846AC8u: goto L_08846AC8;
+    case 0x08846AD0u: goto L_08846AD0;
+    case 0x08846B04u: goto L_08846B04;
+    case 0x08846B0Cu: goto L_08846B0C;
+    case 0x08846B40u: goto L_08846B40;
+    case 0x08846B48u: goto L_08846B48;
+    case 0x08846B7Cu: goto L_08846B7C;
+    case 0x08846B84u: goto L_08846B84;
+    case 0x08846BA0u: goto L_08846BA0;
     case 0x08846BF8u: goto L_08846BF8;
     case 0x08846C0Cu: goto L_08846C0C;
     case 0x08846C18u: goto L_08846C18;
@@ -10273,6 +10285,27 @@ L_08846A60:
         return;
     }
     // nop
+    ctx.pc = jump_target;
+    local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+    return;
+// ARCH-SYNTH: stubs for jump table functions 0x08846A78-0x08846BA0.
+// These functions are installed into the jump table at 0x089C89C0 by INIT.
+// The recompiler did not compile them since no static call exists. Return 1 (success).
+L_08846A78:
+L_08846A98:
+L_08846AC8:
+L_08846AD0:
+L_08846B04:
+L_08846B0C:
+L_08846B40:
+L_08846B48:
+L_08846B7C:
+L_08846B84:
+L_08846BA0:
+    { static int s_jt_stub_count = 0; if (s_jt_stub_count < 5) { ++s_jt_stub_count; std::printf("[JT-STUB] pc=0x%08X a0=0x%08X ra=0x%08X\n", ctx.pc, ctx.gpr[4], ctx.gpr[31]); fflush(stdout); } }
+    ctx.gpr[2] = 1u;
+    jump_target = ctx.gpr[31];
     ctx.pc = jump_target;
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
@@ -59544,5 +59577,17 @@ void register_generated_unit_2(Runtime &runtime) {
     runtime.register_function(0x08863EA4u, &recomp_unit_0002, "recomp_unit_0002");
     runtime.register_function(0x08863EE4u, &recomp_unit_0002, "recomp_unit_0002");
     runtime.register_function(0x08863F0Cu, &recomp_unit_0002, "recomp_unit_0002");
+    // ARCH-SYNTH: register jump table stubs (gap 0x08846A78-0x08846BA0)
+    runtime.register_function(0x08846A78u, &recomp_unit_0002, "recomp_unit_0002");
+    runtime.register_function(0x08846A98u, &recomp_unit_0002, "recomp_unit_0002");
+    runtime.register_function(0x08846AC8u, &recomp_unit_0002, "recomp_unit_0002");
+    runtime.register_function(0x08846AD0u, &recomp_unit_0002, "recomp_unit_0002");
+    runtime.register_function(0x08846B04u, &recomp_unit_0002, "recomp_unit_0002");
+    runtime.register_function(0x08846B0Cu, &recomp_unit_0002, "recomp_unit_0002");
+    runtime.register_function(0x08846B40u, &recomp_unit_0002, "recomp_unit_0002");
+    runtime.register_function(0x08846B48u, &recomp_unit_0002, "recomp_unit_0002");
+    runtime.register_function(0x08846B7Cu, &recomp_unit_0002, "recomp_unit_0002");
+    runtime.register_function(0x08846B84u, &recomp_unit_0002, "recomp_unit_0002");
+    runtime.register_function(0x08846BA0u, &recomp_unit_0002, "recomp_unit_0002");
 }
 } // namespace psprecomp
