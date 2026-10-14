@@ -86,19 +86,37 @@ std::uint32_t GuestMemory::size() const noexcept { return static_cast<std::uint3
 std::uint32_t GuestMemory::vram_size() const noexcept { return static_cast<std::uint32_t>(vram_.size()); }
 
 bool GuestMemory::is_vram_window(std::uint32_t canonical_address) const noexcept {
-    return canonical_address >= kVramPhysicalBase &&
-           canonical_address < kVramPhysicalBase + kVramAddressSpan;
+    // Standard VRAM mirrors: 0x04000000–0x04800000
+    // Write-combine aperture: 0x0C000000 (canonical of 0x4C000000, top-3 bits stripped)
+    return (canonical_address >= kVramPhysicalBase &&
+            canonical_address < kVramPhysicalBase + kVramAddressSpan) ||
+           (canonical_address >= 0x0C000000u &&
+            canonical_address < 0x0C000000u + kVramAddressSpan);
 }
 
 std::size_t GuestMemory::vram_offset(std::uint32_t canonical_address) const noexcept {
-    return static_cast<std::size_t>((canonical_address - kVramPhysicalBase) & (kVramSize - 1u));
+    const std::uint32_t base = (canonical_address >= 0x0C000000u) ? 0x0C000000u : kVramPhysicalBase;
+    return static_cast<std::size_t>((canonical_address - base) & (kVramSize - 1u));
+}
+
+// 0x0A000000–0x0BFFFFFF is the uncached mirror of main RAM (0x08000000–0x09FFFFFF).
+// canonical() strips only the top 3 bits so this mirror survives; remap it here.
+static constexpr std::uint32_t kUncachedRamBase = 0x0A000000u;
+static constexpr std::uint32_t kUncachedRamSize = 0x02000000u;
+static std::uint32_t remap_uncached_ram(std::uint32_t c) noexcept {
+    if (c >= kUncachedRamBase && c < kUncachedRamBase + kUncachedRamSize)
+        return c - kUncachedRamBase + GuestMemory::kPhysicalBase;
+    return c;
 }
 
 bool GuestMemory::contains(std::uint32_t address, std::size_t length) const noexcept {
-    const std::uint32_t c = canonical(address);
+    const std::uint32_t c = remap_uncached_ram(canonical(address));
     const std::uint64_t end = static_cast<std::uint64_t>(c) + static_cast<std::uint64_t>(length);
-    if (is_vram_window(c) && end <= static_cast<std::uint64_t>(kVramPhysicalBase) + kVramAddressSpan)
-        return true;
+    if (is_vram_window(c)) {
+        const std::uint32_t vbase = (c >= 0x0C000000u) ? 0x0C000000u : kVramPhysicalBase;
+        if (end <= static_cast<std::uint64_t>(vbase) + kVramAddressSpan)
+            return true;
+    }
     if (c >= kPhysicalBase && end <= static_cast<std::uint64_t>(kPhysicalBase) + bytes_.size())
         return true;
     return false;
@@ -108,7 +126,7 @@ GuestMemory::ResolvedAddress GuestMemory::resolve(std::uint32_t address, std::si
     if (!contains(address, length)) {
         throw Error("Guest memory access outside PSP RAM/EDRAM at " + hex32(address));
     }
-    const std::uint32_t c = canonical(address);
+    const std::uint32_t c = remap_uncached_ram(canonical(address));
     if (is_vram_window(c))
         return {Region::Vram, vram_offset(c)};
     return {Region::Ram, static_cast<std::size_t>(c - kPhysicalBase)};
@@ -125,7 +143,7 @@ std::vector<std::uint8_t> &GuestMemory::region_bytes(Region region) noexcept {
 // when the inline main-RAM fast path in the header declines the access: EDRAM,
 // an out-of-range address, a region-crossing width, or an armed write watch.
 std::uint8_t GuestMemory::aot_load8_slow(std::uint32_t address) const {
-    const std::uint32_t c = canonical(address);
+    const std::uint32_t c = remap_uncached_ram(canonical(address));
     if (is_vram_window(c)) return vram_[vram_offset(c)];
     if (c >= kPhysicalBase && c - kPhysicalBase < bytes_.size())
         return bytes_[static_cast<std::size_t>(c - kPhysicalBase)];
@@ -133,7 +151,7 @@ std::uint8_t GuestMemory::aot_load8_slow(std::uint32_t address) const {
 }
 
 std::uint16_t GuestMemory::aot_load16_slow(std::uint32_t address) const {
-    const std::uint32_t c = canonical(address);
+    const std::uint32_t c = remap_uncached_ram(canonical(address));
     if (is_vram_window(c)) {
         const std::size_t offset = vram_offset(c);
         if (offset + 2u <= vram_.size())
@@ -149,7 +167,7 @@ std::uint16_t GuestMemory::aot_load16_slow(std::uint32_t address) const {
 }
 
 std::uint32_t GuestMemory::aot_load32_slow(std::uint32_t address) const {
-    const std::uint32_t c = canonical(address);
+    const std::uint32_t c = remap_uncached_ram(canonical(address));
     const std::vector<std::uint8_t> *data = nullptr;
     std::size_t offset = 0u;
     if (is_vram_window(c)) {
@@ -181,7 +199,7 @@ std::uint32_t GuestMemory::aot_load_word_right(std::uint32_t address, std::uint3
 
 void GuestMemory::aot_store8_slow(std::uint32_t address, std::uint8_t value) {
     if (write_watch_enabled_) { store8(address, value); return; }
-    const std::uint32_t c = canonical(address);
+    const std::uint32_t c = remap_uncached_ram(canonical(address));
     if (is_vram_window(c)) { vram_[vram_offset(c)] = value; return; }
     if (c >= kPhysicalBase && c - kPhysicalBase < bytes_.size()) {
         bytes_[static_cast<std::size_t>(c - kPhysicalBase)] = value;
@@ -191,7 +209,7 @@ void GuestMemory::aot_store8_slow(std::uint32_t address, std::uint8_t value) {
 }
 void GuestMemory::aot_store16_slow(std::uint32_t address, std::uint16_t value) {
     if (write_watch_enabled_) { store16(address, value); return; }
-    const std::uint32_t c = canonical(address);
+    const std::uint32_t c = remap_uncached_ram(canonical(address));
     std::vector<std::uint8_t> *data = nullptr;
     std::size_t offset = 0u;
     if (is_vram_window(c)) { data = &vram_; offset = vram_offset(c); }
@@ -205,7 +223,7 @@ void GuestMemory::aot_store16_slow(std::uint32_t address, std::uint16_t value) {
 }
 void GuestMemory::aot_store32_slow(std::uint32_t address, std::uint32_t value) {
     if (write_watch_enabled_) { store32(address, value); return; }
-    const std::uint32_t c = canonical(address);
+    const std::uint32_t c = remap_uncached_ram(canonical(address));
     std::vector<std::uint8_t> *data = nullptr;
     std::size_t offset = 0u;
     if (is_vram_window(c)) { data = &vram_; offset = vram_offset(c); }
@@ -291,7 +309,7 @@ std::uint8_t *GuestMemory::raw_pointer(std::uint32_t address, std::size_t length
 }
 
 const std::uint8_t *GuestMemory::raw_pointer(std::uint32_t address, std::size_t length) const noexcept {
-    const std::uint32_t c = canonical(address);
+    const std::uint32_t c = remap_uncached_ram(canonical(address));
     if (is_vram_window(c)) {
         const std::size_t offset = vram_offset(c);
         // A run that would wrap past the end of the 2 MiB EDRAM image is not

@@ -4347,8 +4347,48 @@ L_089C5AC0: // sceDisplaySetFrameBuf(buf, bufWidth, pixelFormat, sync)
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_089C5AC8: // sceDisplayWaitVblankStartCB() — same as sceDisplayWaitVblankStart
-    { static auto s_vblank_cb_start = std::chrono::steady_clock::now();
+L_089C5AC8: // sceDisplayWaitVblankStartCB() — execute DL, present, then wait 16ms
+    { static std::uint32_t s_vcb_frame = 0u;
+      ++s_vcb_frame;
+      // Execute the render-chain DL built by FUN_089AD370 for this frame.
+      { const std::uint32_t render_chain_root_va = 0x09AF719Cu;
+        if (rt.memory().contains(render_chain_root_va, 4u)) {
+            const std::uint32_t node_ptr = rt.memory().load32(render_chain_root_va) & 0x1FFFFFFFu;
+            if (s_vcb_frame <= 5u) {
+                const std::uint32_t slot_ptr_dbg = rt.memory().contains(0x09AF6830u,4u) ? rt.memory().load32(0x09AF6830u) : 0;
+                const std::uint32_t dl_s = slot_ptr_dbg && rt.memory().contains(slot_ptr_dbg,12u) ? (rt.memory().load32(slot_ptr_dbg+4u)&0x1FFFFFFFu) : 0;
+                const std::uint32_t dl_e = slot_ptr_dbg && rt.memory().contains(slot_ptr_dbg,12u) ? (rt.memory().load32(slot_ptr_dbg+8u)&0x1FFFFFFFu) : 0;
+                std::printf("[VCB-DL] frame=%u node=0x%08X slot=0x%08X dl=[0x%08X..0x%08X] v0_ad370=0x%08X\n",
+                    s_vcb_frame, node_ptr, slot_ptr_dbg, dl_s, dl_e, ctx.gpr[2]);
+            }
+            if (node_ptr && rt.memory().contains(node_ptr, 4u)) {
+                void *vram_ptr = rt.memory().raw_pointer(0x04000000u, 0x200000u);
+                const auto &mem_vec = rt.memory().bytes();
+                if (vram_ptr) {
+                    const std::uint32_t *node_dl = reinterpret_cast<const std::uint32_t *>(
+                        rt.memory().raw_pointer(node_ptr, 4u));
+                    d012::ge_exec(node_dl, node_dl + 65536u, vram_ptr, 0x200000u,
+                                  mem_vec.data(), mem_vec.size());
+                }
+            }
+        }
+      }
+      // Present back buffer.
+      { const auto &vram = rt.memory().vram_bytes();
+        constexpr std::size_t kBackOff = 0x44000u;
+        if (kBackOff < vram.size()) {
+            if (s_vcb_frame <= 5u) {
+                std::uint32_t nz = 0;
+                const std::uint8_t *px = vram.data() + kBackOff;
+                const std::size_t total = std::min(vram.size() - kBackOff, std::size_t(480*272*4));
+                for (std::size_t i = 0; i < total; i += 4)
+                    if (px[i]|px[i+1]|px[i+2]|px[i+3]) ++nz;
+                std::printf("[VCB-PRESENT] frame=%u non_zero=%u\n", s_vcb_frame, nz);
+            }
+            d012::display_present(vram.data() + kBackOff, 512, 1 /* RGBA5551 */);
+        }
+      }
+      static auto s_vblank_cb_start = std::chrono::steady_clock::now();
       const auto now = std::chrono::steady_clock::now();
       const auto us_elapsed = std::chrono::duration_cast<std::chrono::microseconds>(now - s_vblank_cb_start).count();
       const std::int64_t us_per_frame = 16667;
@@ -4363,9 +4403,71 @@ L_089C5AC8: // sceDisplayWaitVblankStartCB() — same as sceDisplayWaitVblankSta
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_089C5AD0: // sceDisplayWaitVblankStart() — wait until next 16ms boundary then pump
+L_089C5AD0: // sceDisplayWaitVblankStart() — wait until next 16ms boundary, execute DL, present
     { static auto s_vblank_start = std::chrono::steady_clock::now();
-      // Advance to the NEXT vblank boundary (round up to next 16667us tick)
+      static std::uint32_t s_vblank_frame = 0u;
+      ++s_vblank_frame;
+      // Execute the render-chain DL rooted at DAT_09AF719C (built each frame by FUN_089AD370).
+      // This must happen at vsync time, AFTER the game has finished filling the DL.
+      { const std::uint32_t render_chain_root_va = 0x09AF719Cu;
+        if (rt.memory().contains(render_chain_root_va, 4u)) {
+            const std::uint32_t node_ptr = rt.memory().load32(render_chain_root_va) & 0x1FFFFFFFu;
+            if (s_vblank_frame <= 5u)
+                std::printf("[VSYNC-DL] frame=%u node_ptr=0x%08X\n", s_vblank_frame, node_ptr);
+            if (node_ptr && rt.memory().contains(node_ptr, 4u)) {
+                void *vram_ptr = rt.memory().raw_pointer(0x04000000u, 0x200000u);
+                const auto &mem_vec = rt.memory().bytes();
+                if (vram_ptr) {
+                    const std::uint32_t *node_dl = reinterpret_cast<const std::uint32_t *>(
+                        rt.memory().raw_pointer(node_ptr, 4u));
+                    d012::ge_exec(node_dl, node_dl + 65536u, vram_ptr, 0x200000u,
+                                  mem_vec.data(), mem_vec.size());
+                }
+            }
+        }
+      }
+      // Also run the GE slot DL (ring buffer cursor-based).
+      { extern std::uint32_t g_ge_list_start;
+        extern std::uint32_t g_ge_exec_cursor;
+        const std::uint32_t slot_ptr_va = 0x09AF6830u;
+        if (rt.memory().contains(slot_ptr_va, 4u)) {
+            const std::uint32_t slot_ptr = rt.memory().load32(slot_ptr_va);
+            if (slot_ptr && rt.memory().contains(slot_ptr, 12u)) {
+                const std::uint32_t dl_start    = rt.memory().load32(slot_ptr + 4u) & 0x1FFFFFFFu;
+                const std::uint32_t dl_end_addr = rt.memory().load32(slot_ptr + 8u) & 0x1FFFFFFFu;
+                if (dl_start && dl_end_addr > dl_start
+                    && rt.memory().contains(dl_start, 4u)
+                    && rt.memory().contains(dl_end_addr - 4u, 4u)) {
+                    void *vram_ptr = rt.memory().raw_pointer(0x04000000u, 0x200000u);
+                    const auto &mem_vec = rt.memory().bytes();
+                    if (vram_ptr) {
+                        const auto *dl_ptr = reinterpret_cast<const std::uint32_t *>(
+                            rt.memory().raw_pointer(dl_start, 4u));
+                        const auto *dl_end = reinterpret_cast<const std::uint32_t *>(
+                            rt.memory().raw_pointer(dl_end_addr, 4u));
+                        d012::ge_exec(dl_ptr, dl_end, vram_ptr, 0x200000u,
+                                      mem_vec.data(), mem_vec.size());
+                    }
+                }
+            }
+        }
+      }
+      // Present the back buffer (VRAM+0x44000 = buf at 0x04044000).
+      { const auto &vram = rt.memory().vram_bytes();
+        constexpr std::size_t kBackOff = 0x44000u; // standard PSP back buffer offset
+        if (kBackOff < vram.size()) {
+            if (s_vblank_frame <= 5u) {
+                std::uint32_t nz = 0;
+                const std::uint8_t *px = vram.data() + kBackOff;
+                const std::size_t total = std::min(vram.size() - kBackOff, std::size_t(480*272*4));
+                for (std::size_t i = 0; i < total; i += 4)
+                    if (px[i]|px[i+1]|px[i+2]|px[i+3]) ++nz;
+                std::printf("[VSYNC-PRESENT] frame=%u non_zero=%u\n", s_vblank_frame, nz);
+            }
+            d012::display_present(vram.data() + kBackOff, 512, 1 /* RGBA5551 */);
+        }
+      }
+      // Wait for the next 16ms boundary.
       const auto now = std::chrono::steady_clock::now();
       const auto us_elapsed = std::chrono::duration_cast<std::chrono::microseconds>(now - s_vblank_start).count();
       const std::int64_t us_per_frame = 16667;

@@ -32945,6 +32945,11 @@ L_088F4840:
     if (rt.invoke_chained_direct<&recomp_unit_0006_entry, 6u, 86u, 0x088C5140u>(ctx, &aot_mem) && ctx.pc == 0x088F4848u) goto L_088F4848;
     return;
 L_088F4848:
+    if (ctx.gpr[2] == 0u) {
+        // 0x088C5140 returned null — skip deref, return 0
+        ctx.gpr[2] = 0u;
+        goto L_088F485C;
+    }
     ctx.gpr[4] = (aot_mem.aot_load8(ctx.gpr[2] + static_cast<std::uint32_t>(2)));
     ctx.gpr[4] = (ctx.gpr[4] & 240u);
     ctx.gpr[2] = (static_cast<std::uint32_t>(static_cast<std::int32_t>(ctx.gpr[4]) >> 4u));
@@ -33044,6 +33049,16 @@ L_088F48F8:
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
 L_088F4900:
+    if (ctx.gpr[6] == 0u) {
+        // null source pointer — skip, return 0
+        { static int once=0; if(!once++){std::printf("[088F4900] gpr[6]=null, skipping 088C51AC call ra=0x%08X\n", ctx.gpr[31]); fflush(stdout);} }
+        ctx.gpr[2] = 0u;
+        jump_target = ctx.gpr[31];
+        ctx.pc = jump_target;
+        local_pc = jump_target;
+        if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+        return;
+    }
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-32));
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(0), ctx.gpr[16]);
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(4), ctx.gpr[17]);

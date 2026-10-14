@@ -30230,6 +30230,7 @@ L_0887263C:
     ctx.gpr[4] = (2205u << 16u);
     ctx.gpr[11] = (aot_mem.aot_load32(ctx.gpr[4] + static_cast<std::uint32_t>(-26004)));
     ctx.gpr[10] = (aot_mem.aot_load32(ctx.gpr[4] + static_cast<std::uint32_t>(-26008)));
+    { static int dbg263c=0; if(dbg263c<5){dbg263c++; std::printf("[0887263C] gpr[8]=0x%08X gpr[31/ra]=0x%08X\n", ctx.gpr[8], ctx.gpr[31]); fflush(stdout);} }
     if (ctx.gpr[8] < 0x08800000u || ctx.gpr[8] >= 0x09F00000u) {
         std::printf("[0887263C] gpr[8]=0x%08X invalid, skipping (ra=0x%08X)\n", ctx.gpr[8], ctx.gpr[31]); fflush(stdout);
         jump_target = ctx.gpr[31];
@@ -30282,6 +30283,14 @@ L_0887267C:
     goto L_0887268C;
 L_0887268C:
     ctx.gpr[8] = (ctx.gpr[8] + static_cast<std::uint32_t>(16));
+    if (ctx.gpr[8] < 0x08800000u || ctx.gpr[8] >= 0x09F00000u) {
+        std::printf("[0887268C] gpr[8]=0x%08X out of RAM after +16, aborting loop ra=0x%08X\n", ctx.gpr[8], ctx.gpr[31]); fflush(stdout);
+        jump_target = ctx.gpr[31];
+        ctx.pc = jump_target;
+        local_pc = jump_target;
+        if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+        return;
+    }
     ctx.gpr[5] = (aot_mem.aot_load32(ctx.gpr[8] + static_cast<std::uint32_t>(4)));
     ctx.gpr[4] = (aot_mem.aot_load32(ctx.gpr[8] + static_cast<std::uint32_t>(0)));
     { const bool branch_taken = ctx.gpr[4] != ctx.gpr[10];
@@ -30342,12 +30351,13 @@ L_088726E0:
       goto L_088726F4;
     }
 L_088726F4:
+    { static int dbg26f4=0; if(dbg26f4<5){dbg26f4++; std::printf("[088726F4] gpr[4]=0x%08X gpr[5]=0x%08X\n", ctx.gpr[4], ctx.gpr[5]); fflush(stdout);} }
     if (ctx.gpr[5] < 0x08800000u || ctx.gpr[5] >= 0x09F00000u) {
-        { static bool once=false; if(!once){once=true; std::printf("[088726F4] gpr[5]=0x%08X out of RAM, skipping\n", ctx.gpr[5]); fflush(stdout);} }
+        std::printf("[088726F4] gpr[5]=0x%08X out of RAM, skipping\n", ctx.gpr[5]); fflush(stdout);
         goto L_08872714;
     }
     if (ctx.gpr[4] < 0x08800000u || ctx.gpr[4] >= 0x09F00000u) {
-        { static bool once=false; if(!once){once=true; std::printf("[088726F4] gpr[4]=0x%08X (gpr16+76) out of RAM, skipping\n", ctx.gpr[4]); fflush(stdout);} }
+        std::printf("[088726F4] gpr[4]=0x%08X (gpr16+76) out of RAM, skipping\n", ctx.gpr[4]); fflush(stdout);
         goto L_08872714;
     }
     ctx.gpr[8] = (ctx.gpr[4] | 0u);
@@ -30975,6 +30985,11 @@ L_08872F34:
     jump_target = ctx.gpr[5];
     ctx.gpr[31] = (0x08872F60u);
     ctx.gpr[6] = (ctx.gpr[8] | 0u);
+    if (jump_target < 0x08800000u || jump_target >= 0x09F00000u) {
+        std::printf("[08872F2C] bad jump_target=0x%08X (fn ptr at gpr16+52+12), skipping call ra=0x%08X\n", jump_target, ctx.gpr[31]); fflush(stdout);
+        ctx.gpr[2] = 0u;
+        goto L_08872F60;
+    }
     ctx.pc = jump_target;
     if (rt.invoke_chained_call(ctx, &aot_mem) && ctx.pc == 0x08872F60u) goto L_08872F60;
     return;
@@ -54068,16 +54083,49 @@ L_0888251C:
     ctx.gpr[4] = (ctx.gpr[19] | 0u);
     ctx.pc = jump_target;
     { const std::uint32_t task_fn_saved = jump_target;
+      const std::uint32_t sched_sp_saved   = ctx.gpr[29]; // save SP before task
+      const std::uint32_t sched_gpr16_saved = ctx.gpr[16]; // save gpr[16]=s0
+      const std::uint32_t sched_gpr17_saved = ctx.gpr[17]; // save gpr[17]=s1 (mask)
+      const std::uint32_t sched_gpr18_saved = ctx.gpr[18]; // save gpr[18]=s2 (val)
+      const std::uint32_t sched_gpr19_saved = ctx.gpr[19]; // save gpr[19]=s3 (task ptr)
+      const std::uint32_t sched_gpr20_saved = ctx.gpr[20]; // save gpr[20]=s4
+      const std::uint32_t sched_gpr21_saved = ctx.gpr[21]; // save gpr[21]=s5
       int chain_iters = 0;
       while (true) {
           bool ok = rt.invoke_chained_call(ctx, &aot_mem);
           if (ok && ctx.pc == 0x08882530u) goto L_08882530;
+          // 0x0893346C = unit-9 outer scheduler call-return site; the task completed
+          // through the re-entrant FUN_08882250 path — treat as a clean task exit.
+          // 0x08884040 = main game-loop entry in unit 4; FUN_08883EE8 (vsync task) has
+          // a static return to this address baked in — treat as a clean task exit.
+          if (ok && (ctx.pc == 0x0893346Cu || ctx.pc == 0x08884040u)) {
+              ctx.gpr[16] = sched_gpr16_saved;
+              ctx.gpr[17] = sched_gpr17_saved;
+              ctx.gpr[18] = sched_gpr18_saved;
+              ctx.gpr[19] = sched_gpr19_saved;
+              ctx.gpr[20] = sched_gpr20_saved;
+              ctx.gpr[21] = sched_gpr21_saved;
+              ctx.gpr[29] = sched_sp_saved;
+              ctx.pc = 0x08882538u;
+              goto L_08882538;
+          }
           if (ok) {
-              // chain returned but pc != 0x08882530 — genuine early exit
+              // chain returned but pc is unexpected — task exited early; treat as done
               static std::uint32_t s_bad = 0u; ++s_bad;
               if (s_bad <= 5u || (s_bad & 0xFFFu) == 0u)
                   std::printf("[CHAIN-BAD#%u] fn=0x%08X pc=0x%08X after %d iters\n", s_bad, task_fn_saved, ctx.pc, chain_iters);
-              return;
+              // Restore scheduler registers so the scheduler loop continues cleanly.
+              // Jump to L_08882538 (skip task-struct gpr[17]/gpr[18] restore which uses
+              // potentially clobbered gpr[19] fields).
+              ctx.gpr[16] = sched_gpr16_saved;
+              ctx.gpr[17] = sched_gpr17_saved;
+              ctx.gpr[18] = sched_gpr18_saved;
+              ctx.gpr[19] = sched_gpr19_saved;
+              ctx.gpr[20] = sched_gpr20_saved;
+              ctx.gpr[21] = sched_gpr21_saved;
+              ctx.gpr[29] = sched_sp_saved;
+              ctx.pc = 0x08882538u;
+              goto L_08882538;
           }
           // budget exhausted — ctx.pc is where execution paused; re-enter
           ++chain_iters;
@@ -57446,6 +57494,7 @@ L_08883F78:
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
 L_08883F9C:
+    { static int s_f9c=0; if(s_f9c<3){s_f9c++; std::printf("[F9C#%d] entry sp=0x%08X gpr[4]=0x%08X\n",s_f9c,ctx.gpr[29],ctx.gpr[4]); fflush(stdout);} }
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-32));
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(0), ctx.gpr[16]);
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(4), ctx.gpr[17]);
@@ -57460,20 +57509,25 @@ L_08883F9C:
     ctx.gpr[31] = (0x08883FD0u);
     ctx.gpr[18] = (ctx.gpr[6] & 255u);
     if (rt.invoke_chained_direct<&recomp_unit_0014_entry, 14u, 324u, 0x089C5FB8u>(ctx, &aot_mem) && ctx.pc == 0x08883FD0u) goto L_08883FD0;
+    { static int s_f9c_r1=0; if(s_f9c_r1<3){s_f9c_r1++; std::printf("[F9C#%d] BAIL after sysTimeLow pc=0x%08X\n",s_f9c_r1,ctx.pc); fflush(stdout);} }
     return;
 L_08883FD0:
     ctx.gpr[19] = (ctx.gpr[2] | 0u);
+    { static int s_fd0=0; if(s_fd0<3){s_fd0++; std::printf("[FD0#%d] reached, systime=0x%08X\n",s_fd0,ctx.gpr[2]); fflush(stdout);} }
     ctx.gpr[4] = (0u | 4u);
     ctx.gpr[31] = (0x08883FE0u);
     ctx.gpr[5] = (0u | 0u);
     if (rt.invoke_chained_direct<&recomp_unit_0012_entry, 12u, 4554u, 0x089A0190u>(ctx, &aot_mem) && ctx.pc == 0x08883FE0u) goto L_08883FE0;
+    { static int s_f9c_r2=0; if(s_f9c_r2<3){s_f9c_r2++; std::printf("[F9C#%d] BAIL after GEsync pc=0x%08X\n",s_f9c_r2,ctx.pc); fflush(stdout);} }
     return;
 L_08883FE0:
+    { static int s_fe0=0; if(s_fe0<3){s_fe0++; std::printf("[FE0#%d] GEsync ok\n",s_fe0); fflush(stdout);} }
     ctx.gpr[31] = (0x08883FE8u);
     // nop
     if (rt.invoke_chained_direct<&recomp_unit_0014_entry, 14u, 324u, 0x089C5FB8u>(ctx, &aot_mem) && ctx.pc == 0x08883FE8u) goto L_08883FE8;
     return;
 L_08883FE8:
+    { static int s_fe8=0; if(s_fe8<3){s_fe8++; std::printf("[FE8#%d] sysTimeLow2 done, v0=0x%08X gpr16+0=%d\n",s_fe8,ctx.gpr[2],(int)aot_mem.aot_load8(ctx.gpr[16]+0)); fflush(stdout);} }
     ctx.gpr[4] = (aot_mem.aot_load8(ctx.gpr[16] + static_cast<std::uint32_t>(0)));
     ctx.gpr[20] = (ctx.gpr[2] | 0u);
     { const bool branch_taken = ctx.gpr[4] != 0u;
@@ -57495,6 +57549,7 @@ L_08884004:
     if (rt.invoke_chained_direct<&recomp_unit_0013_entry, 13u, 1844u, 0x089AD370u>(ctx, &aot_mem) && ctx.pc == 0x0888400Cu) goto L_0888400C;
     return;
 L_0888400C:
+    { static int s_40c=0; if(s_40c<3){s_40c++; std::printf("[40C#%d] after FUN_089AD370 v0=0x%08X gpr[17]=%d\n",s_40c,ctx.gpr[2],ctx.gpr[17]); fflush(stdout);} }
     { const bool branch_taken = ctx.gpr[17] != 0u;
     // nop
       if (branch_taken) {

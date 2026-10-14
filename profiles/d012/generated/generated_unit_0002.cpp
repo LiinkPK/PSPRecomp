@@ -10236,6 +10236,20 @@ L_08846A60:
     ctx.gpr[1] = (ctx.gpr[1] + ctx.gpr[4]);
     ctx.gpr[1] = (aot_mem.aot_load32(ctx.gpr[1] + static_cast<std::uint32_t>(-30272)));
     jump_target = ctx.gpr[1];
+    if (jump_target < 0x08800000u || jump_target >= 0x09F00000u) {
+        std::printf("[08846A60] bad jump table entry=0x%08X (index*4=0x%08X), returning ra=0x%08X\n",
+                    jump_target, ctx.gpr[4], ctx.gpr[31]); fflush(stdout);
+        ctx.gpr[2] = 0u;
+        // L_08846A3C saved: gpr[16]@sp+0, gpr[17]@sp+4, ra@sp+8 — restore before returning
+        ctx.gpr[16] = aot_mem.aot_load32(ctx.gpr[29] + 0u);
+        ctx.gpr[17] = aot_mem.aot_load32(ctx.gpr[29] + 4u);
+        jump_target  = aot_mem.aot_load32(ctx.gpr[29] + 8u);
+        ctx.gpr[29] += 16u;
+        ctx.pc = jump_target;
+        local_pc = jump_target;
+        if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+        return;
+    }
     // nop
     ctx.pc = jump_target;
     local_pc = jump_target;
