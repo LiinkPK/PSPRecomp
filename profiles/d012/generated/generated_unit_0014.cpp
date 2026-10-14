@@ -4354,13 +4354,8 @@ L_089C5AC8: // sceDisplayWaitVblankStartCB() — execute DL, present, then wait 
       { const std::uint32_t render_chain_root_va = 0x09AF719Cu;
         if (rt.memory().contains(render_chain_root_va, 4u)) {
             const std::uint32_t node_ptr = rt.memory().load32(render_chain_root_va) & 0x1FFFFFFFu;
-            if (s_vcb_frame <= 5u) {
-                const std::uint32_t slot_ptr_dbg = rt.memory().contains(0x09AF6830u,4u) ? rt.memory().load32(0x09AF6830u) : 0;
-                const std::uint32_t dl_s = slot_ptr_dbg && rt.memory().contains(slot_ptr_dbg,12u) ? (rt.memory().load32(slot_ptr_dbg+4u)&0x1FFFFFFFu) : 0;
-                const std::uint32_t dl_e = slot_ptr_dbg && rt.memory().contains(slot_ptr_dbg,12u) ? (rt.memory().load32(slot_ptr_dbg+8u)&0x1FFFFFFFu) : 0;
-                std::printf("[VCB-DL] frame=%u node=0x%08X slot=0x%08X dl=[0x%08X..0x%08X] v0_ad370=0x%08X\n",
-                    s_vcb_frame, node_ptr, slot_ptr_dbg, dl_s, dl_e, ctx.gpr[2]);
-            }
+            if (s_vcb_frame <= 3u)
+                std::printf("[VCB-DL] frame=%u node=0x%08X\n", s_vcb_frame, node_ptr);
             if (node_ptr && rt.memory().contains(node_ptr, 4u)) {
                 void *vram_ptr = rt.memory().raw_pointer(0x04000000u, 0x200000u);
                 const auto &mem_vec = rt.memory().bytes();

@@ -57494,7 +57494,6 @@ L_08883F78:
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
 L_08883F9C:
-    { static int s_f9c=0; if(s_f9c<3){s_f9c++; std::printf("[F9C#%d] entry sp=0x%08X gpr[4]=0x%08X\n",s_f9c,ctx.gpr[29],ctx.gpr[4]); fflush(stdout);} }
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-32));
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(0), ctx.gpr[16]);
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(4), ctx.gpr[17]);
