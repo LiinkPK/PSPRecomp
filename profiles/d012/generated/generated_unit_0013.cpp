@@ -25339,6 +25339,7 @@ L_089AD23C:
       goto L_089AD298;
     }
 L_089AD298:
+    { static int s=0; if(s++<3) std::printf("[RCHAIN-HEAD] writing 0x%08X to 0x09AF719C\n",ctx.gpr[6]); fflush(stdout); }
     aot_mem.aot_store32(ctx.gpr[7] + static_cast<std::uint32_t>(29084), ctx.gpr[6]);
     goto L_089AD2C0;
 L_089AD2A0:
@@ -32372,6 +32373,12 @@ L_089B0DDC:
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
 L_089B0DE4:
+    if (ctx.gpr[4] != 0u && ctx.gpr[4] < 0x08000000u) { // guard: invalid ptr (UID), treat as null
+        ctx.gpr[2] = 0u; ctx.gpr[3] = 0u;
+        jump_target = ctx.gpr[31]; ctx.pc = jump_target; local_pc = jump_target;
+        if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+        return;
+    }
     { const bool branch_taken = ctx.gpr[4] != 0u;
     ctx.gpr[3] = (ctx.gpr[4] + static_cast<std::uint32_t>(112));
       if (branch_taken) {

@@ -59,5 +59,6 @@ Roadmap.*
 .claude*
 .continue*
 PROGRESS.json
+reasoning_trace.json
 run*.*
 /Roadmap.html

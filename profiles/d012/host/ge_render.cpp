@@ -186,8 +186,25 @@ static Vertex decode_vertex(const std::uint8_t *&p, std::uint32_t vt) {
 
 // ---- texture sampling -------------------------------------------------------
 
+// Resolve a PSP physical texture address to a host pointer into mem or vram.
+// mem starts at kPhysicalBase (0x08000000); vram starts at 0x04000000.
+static const std::uint8_t *resolve_tex_ptr(std::uint32_t phys, std::size_t nbytes,
+                                             const void *mem, std::size_t mem_size,
+                                             const void *vram, std::size_t vram_size) {
+    static constexpr std::uint32_t kPhysBase = 0x08000000u;
+    if (phys >= 0x04000000u && phys < 0x04200000u) {
+        const std::uint32_t off = phys - 0x04000000u;
+        if (off + nbytes <= vram_size) return static_cast<const std::uint8_t*>(vram) + off;
+    } else if (phys >= kPhysBase) {
+        const std::uint32_t off = phys - kPhysBase;
+        if (off + nbytes <= mem_size) return static_cast<const std::uint8_t*>(mem) + off;
+    }
+    return nullptr;
+}
+
 static std::uint32_t sample_tex(const GeState &gs, float u, float v,
-                                 const void *mem, std::size_t mem_size) {
+                                 const void *mem, std::size_t mem_size,
+                                 const void *vram = nullptr, std::size_t vram_size = 0) {
     if (!gs.tex_enabled || gs.tbp[0] == 0) return 0xFFFFFFFFu;
     // Clamp
     int tw = static_cast<int>(gs.tw), th = static_cast<int>(gs.th);
@@ -197,25 +214,32 @@ static std::uint32_t sample_tex(const GeState &gs, float u, float v,
     ty = std::clamp(ty, 0, th - 1);
 
     const std::uint32_t stride = gs.tbw[0] ? gs.tbw[0] : static_cast<std::uint32_t>(tw);
-    std::uint32_t off = 0;
     std::uint32_t raw = 0;
     switch (gs.tfmt) {
-    case 0: // RGB565 (2 bytes/pixel)
-        off = gs.tbp[0] + (static_cast<std::uint32_t>(ty) * stride + static_cast<std::uint32_t>(tx)) * 2;
-        if (off + 2 <= mem_size) { std::uint16_t p; std::memcpy(&p, static_cast<const char*>(mem) + off, 2); raw = p; }
+    case 0: { // RGB565 (2 bytes/pixel)
+        const std::uint32_t poff = (static_cast<std::uint32_t>(ty) * stride + static_cast<std::uint32_t>(tx)) * 2;
+        const std::uint8_t *p = resolve_tex_ptr(gs.tbp[0] + poff, 2, mem, mem_size, vram, vram_size);
+        if (p) { std::uint16_t v16; std::memcpy(&v16, p, 2); raw = v16; }
         return to_abgr8888(raw, 0);
-    case 1: // RGBA5551
-        off = gs.tbp[0] + (static_cast<std::uint32_t>(ty) * stride + static_cast<std::uint32_t>(tx)) * 2;
-        if (off + 2 <= mem_size) { std::uint16_t p; std::memcpy(&p, static_cast<const char*>(mem) + off, 2); raw = p; }
+    }
+    case 1: { // RGBA5551
+        const std::uint32_t poff = (static_cast<std::uint32_t>(ty) * stride + static_cast<std::uint32_t>(tx)) * 2;
+        const std::uint8_t *p = resolve_tex_ptr(gs.tbp[0] + poff, 2, mem, mem_size, vram, vram_size);
+        if (p) { std::uint16_t v16; std::memcpy(&v16, p, 2); raw = v16; }
         return to_abgr8888(raw, 1);
-    case 2: // RGBA4444
-        off = gs.tbp[0] + (static_cast<std::uint32_t>(ty) * stride + static_cast<std::uint32_t>(tx)) * 2;
-        if (off + 2 <= mem_size) { std::uint16_t p; std::memcpy(&p, static_cast<const char*>(mem) + off, 2); raw = p; }
+    }
+    case 2: { // RGBA4444
+        const std::uint32_t poff = (static_cast<std::uint32_t>(ty) * stride + static_cast<std::uint32_t>(tx)) * 2;
+        const std::uint8_t *p = resolve_tex_ptr(gs.tbp[0] + poff, 2, mem, mem_size, vram, vram_size);
+        if (p) { std::uint16_t v16; std::memcpy(&v16, p, 2); raw = v16; }
         return to_abgr8888(raw, 2);
-    case 3: // RGBA8888
-        off = gs.tbp[0] + (static_cast<std::uint32_t>(ty) * stride + static_cast<std::uint32_t>(tx)) * 4;
-        if (off + 4 <= mem_size) std::memcpy(&raw, static_cast<const char*>(mem) + off, 4);
-        return raw; // already ABGR8888
+    }
+    case 3: { // RGBA8888
+        const std::uint32_t poff = (static_cast<std::uint32_t>(ty) * stride + static_cast<std::uint32_t>(tx)) * 4;
+        const std::uint8_t *p = resolve_tex_ptr(gs.tbp[0] + poff, 4, mem, mem_size, vram, vram_size);
+        if (p) std::memcpy(&raw, p, 4);
+        return raw;
+    }
     default:
         return 0xFFFFFFFFu;
     }
@@ -258,7 +282,7 @@ static void draw_sprite(const GeState &gs, const Vertex &v0, const Vertex &v1,
             const float fu = v0.u + static_cast<float>(x - static_cast<int>(v0.x)) * du;
             std::uint32_t pixel;
             if (gs.tex_enabled)
-                pixel = sample_tex(gs, fu, fv, mem, mem_size);
+                pixel = sample_tex(gs, fu, fv, mem, mem_size, vram, vram_size);
             else
                 pixel = v1.color; // sprite uses v1's color when no texture? use gs.color
 
@@ -314,7 +338,7 @@ static void draw_triangle(const GeState &gs,
             if (gs.tex_enabled) {
                 float fu = w0 * v0.u + w1 * v1.u + w2 * v2.u;
                 float fv = w0 * v0.v + w1 * v1.v + w2 * v2.v;
-                pixel = sample_tex(gs, fu, fv, mem, mem_size);
+                pixel = sample_tex(gs, fu, fv, mem, mem_size, vram, vram_size);
             } else {
                 // Interpolate color
                 std::uint32_t c0 = v0.color, c1 = v1.color, c2 = v2.color;
@@ -339,18 +363,72 @@ static void draw_triangle(const GeState &gs,
     }
 }
 
+// ---- draw line (Bresenham) --------------------------------------------------
+
+static void draw_line(const GeState &gs, const Vertex &v0, const Vertex &v1,
+                      void *vram, std::size_t vram_size) {
+    int x0 = static_cast<int>(v0.x), y0 = static_cast<int>(v0.y);
+    int x1 = static_cast<int>(v1.x), y1 = static_cast<int>(v1.y);
+    const int bpp = (gs.fbfmt == 0) ? 2 : 4;
+    const std::size_t row_bytes = static_cast<std::size_t>(gs.fbw) * bpp;
+
+    const int dx = std::abs(x1 - x0), sx = (x0 < x1) ? 1 : -1;
+    const int dy = -std::abs(y1 - y0), sy = (y0 < y1) ? 1 : -1;
+    int err = dx + dy;
+
+    // Use v1 color for the line (same as sprite convention)
+    const std::uint32_t line_color = v1.color != 0xFFFFFFFFu ? v1.color : gs.color;
+
+    for (;;) {
+        if (x0 >= gs.sc_x1 && x0 < gs.sc_x2 && y0 >= gs.sc_y1 && y0 < gs.sc_y2) {
+            const std::size_t off = gs.fbp + static_cast<std::size_t>(y0) * row_bytes;
+            if (off + static_cast<std::size_t>(x0 + 1) * bpp <= vram_size) {
+                if (gs.fbfmt == 0) {
+                    auto *dst = reinterpret_cast<std::uint16_t*>(static_cast<char*>(vram) + off);
+                    const std::uint8_t r = (line_color >>  0) & 0xFF;
+                    const std::uint8_t g = (line_color >>  8) & 0xFF;
+                    const std::uint8_t b = (line_color >> 16) & 0xFF;
+                    dst[x0] = static_cast<std::uint16_t>(((r>>3)<<11)|((g>>2)<<5)|(b>>3));
+                } else {
+                    auto *dst = reinterpret_cast<std::uint32_t*>(static_cast<char*>(vram) + off);
+                    blend_pixel(&dst[x0], line_color);
+                }
+            }
+        }
+        if (x0 == x1 && y0 == y1) break;
+        const int e2 = 2 * err;
+        if (e2 >= dy) { err += dy; x0 += sx; }
+        if (e2 <= dx) { err += dx; y0 += sy; }
+    }
+}
+
 // ---- main executor ----------------------------------------------------------
 
 void ge_exec(const std::uint32_t *dl, const std::uint32_t *dl_end,
              void *vram, std::size_t vram_size,
-             const void *mem, std::size_t mem_size) {
+             const void *mem, std::size_t mem_size,
+             std::uint32_t initial_base_addr) {
     if (!dl || !vram) return;
 
     GeState gs;
+    gs.base_addr = initial_base_addr;
     static std::uint32_t s_exec_count = 0;
     ++s_exec_count;
     std::printf("[GE] exec #%u dl=%p dl_end=%p span=%zu\n", s_exec_count, (void*)dl, (void*)dl_end, (std::size_t)(dl_end - dl));
 
+    // Dump raw DL for diagnosis (first 3 execs)
+    { static std::uint32_t s_dc = 0; ++s_dc;
+      if (s_dc <= 3) {
+        std::size_t lim = (std::size_t)(dl_end - dl); if (lim > 200) lim = 200;
+        std::printf("[GE-RAW#%u] span=%zu words:\n", s_dc, lim);
+        for (std::size_t i = 0; i < lim; ++i) {
+            if (i % 8 == 0) std::printf("  %04zx:", i*4);
+            std::printf(" %08X", dl[i]);
+            if (i % 8 == 7 || i+1 == lim) std::printf("\n");
+        }
+        fflush(stdout);
+      }
+    }
     // Parse commands. dl_end is the hard limit for the initial segment.
     // After a JUMP we follow the chain freely but still respect memory bounds.
     const std::uint32_t *p = dl;
@@ -375,9 +453,11 @@ void ge_exec(const std::uint32_t *dl, const std::uint32_t *dl_end,
         case 0x00: break; // NOP
         case 0x08: // BASE — upper address bits
             gs.base_addr = (arg & 0xFF0000u) << 8;
+            std::printf("[GE-BASE] arg=0x%06X -> base_addr=0x%08X\n", arg, gs.base_addr); fflush(stdout);
             break;
-        case 0x01: // VADDR
-            gs.vaddr = gs.base_addr | arg;
+        case 0x01: // VADDR — strip PSP address mode bits to get physical address
+            gs.vaddr = (gs.base_addr | arg) & 0x1FFFFFFFu;
+            std::printf("[GE-VADDR] base=0x%08X arg=0x%06X -> vaddr=0x%08X\n", gs.base_addr, arg, gs.vaddr); fflush(stdout);
             break;
         case 0x02: // IADDR
             gs.iaddr = gs.base_addr | arg;
@@ -386,10 +466,11 @@ void ge_exec(const std::uint32_t *dl, const std::uint32_t *dl_end,
             goto done;
         case 0x5C: // JUMP — unconditional jump to address
         case 0x5D: { // JUMP_END — also unconditional for our purposes
-            const std::uint32_t target_phys = (gs.base_addr & 0xFF000000u) | arg;
+            const std::uint32_t target_phys = ((gs.base_addr & 0xFF000000u) | arg) & 0x1FFFFFFFu;
             const std::uint32_t *new_p = nullptr;
-            if (target_phys < mem_size)
-                new_p = reinterpret_cast<const std::uint32_t *>(static_cast<const char *>(mem) + target_phys);
+            static constexpr std::uint32_t kPhysBaseJ = 0x08000000u;
+            if (target_phys >= kPhysBaseJ && (target_phys - kPhysBaseJ) < mem_size)
+                new_p = reinterpret_cast<const std::uint32_t *>(static_cast<const char *>(mem) + (target_phys - kPhysBaseJ));
             else if (target_phys >= 0x04000000u && target_phys < 0x04200000u)
                 new_p = reinterpret_cast<const std::uint32_t *>(static_cast<const char *>(vram) + (target_phys - 0x04000000u));
             if (new_p) { p = new_p - 1; jumped = true; } // -1 because loop does ++p
@@ -476,25 +557,44 @@ void ge_exec(const std::uint32_t *dl, const std::uint32_t *dl_end,
             const std::uint32_t count     = arg & 0xFFFFu;
             if (count == 0) break;
 
-            // Determine vertex stride and decode vertices
-            // vaddr points into guest memory (physical, relative to RAM base 0x08800000 or VRAM 0x04000000)
-            std::uint32_t va = gs.vaddr;
-            // Map to host memory:
-            // PSP RAM is at 0x08800000 in guest VA → we have full flat mem view
-            // But our ge_exec gets mem pointer starting at physical 0 (the loaded ELF image)
-            // The guest memory flat view starts at 0x08800000 (ELF load base).
-            // vaddr after masking 0x1FFFFFFF is a physical address.
-            // PSP physical map: 0x04000000-0x041FFFFF = VRAM, 0x08000000+ = RAM
-            // Our mem pointer = entire addressable space? We need to handle the mapping.
-
-            // Actually: the runtime memory has VRAM at 0x04000000 phys and RAM at 0x08000000+
-            // For simplicity, try to map va to our buffers:
+            // gs.vaddr is already masked to 0x1FFFFFFF (physical address).
+            // PSP physical map: 0x04000000-0x041FFFFF = VRAM; 0x00000000-0x01FFFFFF = main RAM.
+            // mem pointer covers physical 0x00000000+ (PSP RAM), vram covers 0x04000000+.
+            const std::uint32_t va = gs.vaddr;
             const std::uint8_t *vptr = nullptr;
-            if (va >= 0x04000000u && va < 0x04200000u && (va - 0x04000000u) < vram_size)
+            if (va >= 0x04000000u && va < 0x04200000u && (va - 0x04000000u) < vram_size) {
                 vptr = static_cast<const std::uint8_t*>(vram) + (va - 0x04000000u);
-            else if (va < mem_size)
-                vptr = static_cast<const std::uint8_t*>(mem) + va;
-            if (!vptr) break;
+            } else if (va < 0x04000000u) {
+                // GE bus physical RAM range 0x00000000 - 0x03FFFFFF
+                if (va < mem_size)
+                    vptr = static_cast<const std::uint8_t*>(mem) + va;
+            } else if (va >= 0x08000000u && va < 0x0A000000u) {
+                // GE bus RAM range 0x08000000 - 0x09FFFFFF (same physical RAM)
+                const std::uint32_t ram_off = va - 0x08000000u;
+                if (ram_off < mem_size)
+                    vptr = static_cast<const std::uint8_t*>(mem) + ram_off;
+            }
+            if (!vptr) {
+                static std::uint32_t s_vptr_miss = 0;
+                if (++s_vptr_miss <= 5) std::printf("[GE-VPTR-MISS] va=0x%08X mem_size=0x%zX vram_size=0x%zX\n", va, mem_size, vram_size);
+                break;
+            }
+            { // Dump vertex data for diagnostics
+                static std::uint32_t s_vdump = 0;
+                if (++s_vdump <= 4) {
+                    std::printf("[GE-VDATA] va=0x%08X vtype=0x%X bytes:", va, gs.vtype);
+                    for (int _b = 0; _b < 32; ++_b) std::printf(" %02X", vptr[_b]);
+                    std::printf("\n");
+                    // Scan entire RAM for non-zero bytes to verify data loading
+                    const std::uint8_t *ram_base = static_cast<const std::uint8_t*>(mem);
+                    std::uint32_t nz_count = 0; std::uint32_t first_nz_off = 0;
+                    for (std::uint32_t _s = 0; _s < mem_size && nz_count < 3; _s++) {
+                        if (ram_base[_s] != 0) { if (nz_count == 0) first_nz_off = _s; nz_count++; }
+                    }
+                    std::printf("[GE-RAM-SCAN] nonzero_count_first3: first_offset=0x%08X count>=%u\n", first_nz_off, nz_count);
+                    fflush(stdout);
+                }
+            }
 
             if (prim_type == 6) { // GU_SPRITES (2 vertices per sprite)
                 for (std::uint32_t i = 0; i + 1 < count; i += 2) {
@@ -526,6 +626,25 @@ void ge_exec(const std::uint32_t *dl, const std::uint32_t *dl_end,
                     Vertex v2 = decode_vertex(vp, gs.vtype);
                     draw_triangle(gs, (i & 1) ? prev1 : prev0, (i & 1) ? prev0 : prev1, v2, vram, vram_size, mem, mem_size);
                     prev0 = prev1; prev1 = v2;
+                }
+                vptr = vp;
+            } else if (prim_type == 1) { // GU_LINES (pairs of vertices)
+                const std::uint8_t *vp = vptr;
+                static std::uint32_t s_lines_log = 0;
+                for (std::uint32_t i = 0; i + 1 < count; i += 2) {
+                    Vertex va2 = decode_vertex(vp, gs.vtype);
+                    Vertex vb  = decode_vertex(vp, gs.vtype);
+                    if (++s_lines_log <= 4) std::printf("[GE-LINE] (%.1f,%.1f)-(%.1f,%.1f) col=0x%08X\n", va2.x,va2.y,vb.x,vb.y,vb.color);
+                    draw_line(gs, va2, vb, vram, vram_size);
+                }
+                vptr = vp;
+            } else if (prim_type == 2) { // GU_LINE_STRIP
+                const std::uint8_t *vp = vptr;
+                Vertex prev = decode_vertex(vp, gs.vtype);
+                for (std::uint32_t i = 1; i < count; ++i) {
+                    Vertex cur = decode_vertex(vp, gs.vtype);
+                    draw_line(gs, prev, cur, vram, vram_size);
+                    prev = cur;
                 }
                 vptr = vp;
             }

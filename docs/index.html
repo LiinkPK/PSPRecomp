@@ -170,6 +170,10 @@
           <span class="font-bold text-tokyo-accent min-w-[3rem]">S7</span>
           <span class="text-tokyo-muted"><strong class="text-tokyo-text">Task scheduler.</strong> CHAIN-BAD recovery; jump-table epilogue fix; null font guard; scheduler register save/restore; <code class="text-tokyo-red bg-tokyo-red/10 px-1 rounded">0x0893346C</code> and <code class="text-tokyo-red bg-tokyo-red/10 px-1 rounded">0x08884040</code> treated as valid task exits. Frame 1 reaches display task; archive loads. <em>Non-zero pixels still pending.</em></span>
         </div>
+        <div class="flex gap-3 p-2.5 bg-tokyo-bg/60 border border-tokyo-border rounded">
+          <span class="font-bold text-tokyo-accent min-w-[3rem]">S8</span>
+          <span class="text-tokyo-muted"><strong class="text-tokyo-text">GE pipeline root cause.</strong> Traced render chain timing (VCB path confirmed correct). Fixed GE vertex address range. Identified exact geometry blocker: <code class="text-tokyo-red bg-tokyo-red/10 px-1 rounded">ARCH-SYNTH</code> returns fake entries with sub-chunk count=0, halting all vertex data writes. Root: archive object index table not populated despite <code class="text-tokyo-red bg-tokyo-red/10 px-1 rounded">main.bin</code> loaded at <code class="text-tokyo-red bg-tokyo-red/10 px-1 rounded">0x09644A80</code>. Next: find + trigger archive init function.</span>
+        </div>
       </div>
     </section>
 
@@ -267,7 +271,7 @@
           { id: "p3-t1", name: "Understand sceGu calls as recompiled MIPS code",               note: "Game builds display lists directly in RAM",  done: true  },
           { id: "p3-t2", name: "GE command interpreter skeleton (CLEAR, 2D sprites, flat-color)", note: "Software rasterizer handles basic 2D",    done: true  },
           { id: "p3-t3", name: "Texture sampling — RGB565, RGBA8888, DXT, CLUT",               note: "Block-compressed + index-color formats",    done: true  },
-          { id: "p3-t4", name: "First non-zero pixel output",                                    note: "DAT_09AF719C render-chain root still null", done: false },
+          { id: "p3-t4", name: "First non-zero pixel output",                                    note: "Render chain OK; blocker: archive index table unpopulated → sub-chunks=0", done: false },
           { id: "p3-t5", name: "Translate display lists to Vulkan / DX12 / OpenGL",             note: "GPU backend: after software raster proven", done: false },
           { id: "p3-t6", name: "Validate GE interpreter against PPSSPP frame dumps",            note: "Frame-by-frame comparison milestone",       done: false },
         ]

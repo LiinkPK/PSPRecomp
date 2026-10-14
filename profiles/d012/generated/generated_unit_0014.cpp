@@ -4188,7 +4188,7 @@ L_089C5A90: // sceGeListUpdateStallAddr(listid, stall) -> 0
           void *vram_ptr = rt.memory().raw_pointer(0x04000000u, 0x200000u);
           const auto &mem_vec = rt.memory().bytes();
           if (vram_ptr)
-              d012::ge_exec(dl_ptr, dl_end, vram_ptr, 0x200000u, mem_vec.data(), mem_vec.size());
+              d012::ge_exec(dl_ptr, dl_end, vram_ptr, 0x200000u, mem_vec.data(), mem_vec.size(), 0x08000000u);
           g_ge_exec_cursor = new_stall;
       }
     }
@@ -4278,7 +4278,7 @@ L_089C5AC0: // sceDisplaySetFrameBuf(buf, bufWidth, pixelFormat, sync)
             void *vram_ptr = rt.memory().raw_pointer(0x04000000u, 0x200000u);
             const auto &mem_vec = rt.memory().bytes();
             if (vram_ptr)
-                d012::ge_exec(dl_ptr, dl_end, vram_ptr, 0x200000u, mem_vec.data(), mem_vec.size());
+                d012::ge_exec(dl_ptr, dl_end, vram_ptr, 0x200000u, mem_vec.data(), mem_vec.size(), 0x08000000u);
         }
         // Diagnostic: check rendering gate flags
         if (s_frame <= 5u || s_frame == 64u) {
@@ -4299,8 +4299,9 @@ L_089C5AC0: // sceDisplaySetFrameBuf(buf, bufWidth, pixelFormat, sync)
         { const std::uint32_t render_chain_root_va = 0x09AF719Cu;
           if (rt.memory().contains(render_chain_root_va, 4u)) {
               const std::uint32_t node_ptr = rt.memory().load32(render_chain_root_va) & 0x1FFFFFFFu;
+              const std::uint32_t raw_val  = rt.memory().load32(render_chain_root_va);
               if (s_frame <= 5u || s_frame == 64u) {
-                  std::printf("[RENDER-CHAIN] node_ptr=0x%08X (from DAT_09af719c)\n", node_ptr);
+                  std::printf("[RENDER-CHAIN] raw=0x%08X node_ptr=0x%08X (from DAT_09af719c)\n", raw_val, node_ptr);
                   if (node_ptr && rt.memory().contains(node_ptr, 32u)) {
                       for (int _i = 0; _i < 8; ++_i)
                           std::printf("  node[%d]=0x%08X\n", _i, rt.memory().load32(node_ptr + _i*4u));
@@ -4312,7 +4313,7 @@ L_089C5AC0: // sceDisplaySetFrameBuf(buf, bufWidth, pixelFormat, sync)
                   const auto &mem_vec = rt.memory().bytes();
                   const std::uint32_t *node_dl = reinterpret_cast<const std::uint32_t *>(rt.memory().raw_pointer(node_ptr, 4u));
                   if (vram_ptr)
-                      d012::ge_exec(node_dl, node_dl + 65536u, vram_ptr, 0x200000u, mem_vec.data(), mem_vec.size());
+                      d012::ge_exec(node_dl, node_dl + 65536u, vram_ptr, 0x200000u, mem_vec.data(), mem_vec.size(), 0x08000000u);
               }
           }
         }
@@ -4361,16 +4362,44 @@ L_089C5AC8: // sceDisplayWaitVblankStartCB() — execute DL, present, then wait 
       { const std::uint32_t render_chain_root_va = 0x09AF719Cu;
         if (rt.memory().contains(render_chain_root_va, 4u)) {
             const std::uint32_t node_ptr = rt.memory().load32(render_chain_root_va) & 0x1FFFFFFFu;
-            if (s_vcb_frame <= 3u)
+            if (s_vcb_frame <= 3u) {
                 std::printf("[VCB-DL] frame=%u node=0x%08X\n", s_vcb_frame, node_ptr);
+                if (node_ptr && rt.memory().contains(node_ptr, 64u)) {
+                    for (int _i = 0; _i < 16; ++_i)
+                        std::printf("  node[%d]=0x%08X\n", _i, rt.memory().load32(node_ptr + _i*4u));
+                }
+            }
             if (node_ptr && rt.memory().contains(node_ptr, 4u)) {
                 void *vram_ptr = rt.memory().raw_pointer(0x04000000u, 0x200000u);
                 const auto &mem_vec = rt.memory().bytes();
                 if (vram_ptr) {
+                    // The node is a struct; fields 4..7 (words 1..3) likely hold dl_start/dl_end.
+                    // Try each field as a potential DL start pointer.
+                    std::uint32_t dl_va = 0u;
+                    for (int _fi = 1; _fi <= 6 && !dl_va; ++_fi) {
+                        if (!rt.memory().contains(node_ptr + _fi*4u, 4u)) break;
+                        const std::uint32_t cand = rt.memory().load32(node_ptr + _fi*4u) & 0x1FFFFFFFu;
+                        if (cand >= 0x08000000u && cand < 0x0A000000u
+                            && rt.memory().contains(cand, 4u)) {
+                            // Peek: is it a plausible GE opcode?
+                            const std::uint32_t peek = rt.memory().load32(cand);
+                            const std::uint8_t op = static_cast<std::uint8_t>(peek >> 24);
+                            if (op == 0x08 || op == 0xA0 || op == 0xA2 || op == 0x04 || op == 0x9A || op == 0xD2 || op == 0x00) {
+                                dl_va = cand;
+                                if (s_vcb_frame <= 3u) std::printf("[VCB-DL] using field[%d]=0x%08X as DL start (op=0x%02X)\n", _fi, dl_va, op);
+                            }
+                        }
+                    }
+                    if (!dl_va) {
+                        // Fall back: use node_ptr directly (old behaviour)
+                        dl_va = node_ptr;
+                        if (s_vcb_frame <= 3u) std::printf("[VCB-DL] fallback: using node_ptr=0x%08X as DL start\n", dl_va);
+                    }
                     const std::uint32_t *node_dl = reinterpret_cast<const std::uint32_t *>(
-                        rt.memory().raw_pointer(node_ptr, 4u));
-                    d012::ge_exec(node_dl, node_dl + 65536u, vram_ptr, 0x200000u,
-                                  mem_vec.data(), mem_vec.size());
+                        rt.memory().raw_pointer(dl_va, 4u));
+                    if (node_dl)
+                        d012::ge_exec(node_dl, node_dl + 65536u, vram_ptr, 0x200000u,
+                                      mem_vec.data(), mem_vec.size(), 0x08000000u);
                 }
             }
         }
@@ -4378,17 +4407,31 @@ L_089C5AC8: // sceDisplayWaitVblankStartCB() — execute DL, present, then wait 
       // Present back buffer.
       { const auto &vram = rt.memory().vram_bytes();
         constexpr std::size_t kBackOff = 0x44000u;
-        if (kBackOff < vram.size()) {
-            if (s_vcb_frame <= 5u) {
-                std::uint32_t nz = 0;
-                const std::uint8_t *px = vram.data() + kBackOff;
-                const std::size_t total = std::min(vram.size() - kBackOff, std::size_t(480*272*4));
-                for (std::size_t i = 0; i < total; i += 4)
-                    if (px[i]|px[i+1]|px[i+2]|px[i+3]) ++nz;
-                std::printf("[VCB-PRESENT] frame=%u non_zero=%u\n", s_vcb_frame, nz);
-            }
-            d012::display_present(vram.data() + kBackOff, 512, 1 /* RGBA5551 */);
+        if (s_vcb_frame <= 5u) {
+            // Check both front buffer (0x44000) and back buffer at offset 0 (fbp=0)
+            auto count_nz = [&](std::size_t off) -> std::uint32_t {
+                if (off >= vram.size()) return 0u;
+                std::uint32_t n = 0;
+                const std::uint8_t *px = vram.data() + off;
+                const std::size_t tot = std::min(vram.size() - off, std::size_t(480*272*4));
+                for (std::size_t i = 0; i < tot; i += 4)
+                    if (px[i]|px[i+1]|px[i+2]|px[i+3]) ++n;
+                return n;
+            };
+            std::printf("[VCB-PRESENT] frame=%u nz_front(0x44000)=%u nz_back(0x0)=%u\n",
+                s_vcb_frame, count_nz(kBackOff), count_nz(0u));
         }
+        // Present whichever buffer has pixels; prefer front (kBackOff), fall back to offset 0
+        auto pick_present = [&]() -> const std::uint8_t* {
+            if (kBackOff < vram.size()) {
+                const std::uint8_t *p = vram.data() + kBackOff;
+                for (std::size_t i = 0; i < std::min(vram.size()-kBackOff, std::size_t(4)); ++i)
+                    if (p[i]) return p;
+            }
+            return vram.data(); // GE fbp=0 back buffer
+        };
+        const std::uint8_t *present_buf = pick_present();
+        d012::display_present(present_buf, 512, 3 /* RGBA8888 — match fbfmt=3 */);
       }
       static auto s_vblank_cb_start = std::chrono::steady_clock::now();
       const auto now = std::chrono::steady_clock::now();
@@ -4423,7 +4466,7 @@ L_089C5AD0: // sceDisplayWaitVblankStart() — wait until next 16ms boundary, ex
                     const std::uint32_t *node_dl = reinterpret_cast<const std::uint32_t *>(
                         rt.memory().raw_pointer(node_ptr, 4u));
                     d012::ge_exec(node_dl, node_dl + 65536u, vram_ptr, 0x200000u,
-                                  mem_vec.data(), mem_vec.size());
+                                  mem_vec.data(), mem_vec.size(), 0x08000000u);
                 }
             }
         }
@@ -4448,7 +4491,7 @@ L_089C5AD0: // sceDisplayWaitVblankStart() — wait until next 16ms boundary, ex
                         const auto *dl_end = reinterpret_cast<const std::uint32_t *>(
                             rt.memory().raw_pointer(dl_end_addr, 4u));
                         d012::ge_exec(dl_ptr, dl_end, vram_ptr, 0x200000u,
-                                      mem_vec.data(), mem_vec.size());
+                                      mem_vec.data(), mem_vec.size(), 0x08000000u);
                     }
                 }
             }
@@ -5542,8 +5585,19 @@ L_089C5FF8:
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
 L_089C6000: // sceKernelExitDeleteThread(status) -> noreturn
-    std::printf("[HLE] sceKernelExitDeleteThread(%d)\n", static_cast<std::int32_t>(ctx.gpr[4]));
-    rt.stop("sceKernelExitDeleteThread");
+    { static std::uint32_t s_exit_count = 0u;
+      if (++s_exit_count <= 2u)
+          std::printf("[HLE] sceKernelExitDeleteThread(%d) — yielding to main loop\n",
+                      static_cast<std::int32_t>(ctx.gpr[4]));
+      // The PSP game calls this to end the current "phase" and yield back to the OS.
+      // On our host, the main loop at L_08804278 -> L_08804280 -> L_08804270 drives frames.
+      // Return normally so invoke_chained_direct succeeds and the loop continues.
+      ctx.gpr[2] = 0u; // return value = 0 (success)
+      jump_target = ctx.gpr[31]; // return to caller (L_08804280)
+      ctx.pc = jump_target;
+      local_pc = jump_target;
+      if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+    }
     return;
 L_089C6010:
     jump_target = ctx.gpr[31];

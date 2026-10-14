@@ -29678,38 +29678,47 @@ L_088D2A84:
       const std::uint32_t arch = ctx.gpr[4];
       const std::uint32_t key  = ctx.gpr[5];
       bool arch_empty = false;
+      std::uint32_t arch_hdr = 0, arch_hdr8 = 0;
       if (arch && arch >= 0x08800000u && arch < 0x0A000000u) {
-          const std::uint32_t hdr = aot_mem.aot_load32(arch + 0);
-          if (hdr && hdr >= 0x08800000u && hdr < 0x0A000000u) {
-              arch_empty = (aot_mem.aot_load32(hdr + 8) == 0u);
+          arch_hdr = aot_mem.aot_load32(arch + 0);
+          if (arch_hdr && arch_hdr >= 0x08800000u && arch_hdr < 0x0A000000u) {
+              arch_hdr8 = aot_mem.aot_load32(arch_hdr + 8);
+              arch_empty = (arch_hdr8 == 0u);
           } else {
               arch_empty = true;
           }
       }
+      { static std::uint32_t s_dc=0; if(s_dc++ < 4) {
+          char kb2[64]={};
+          if (key && key >= 0x08800000u && key < 0x0A000000u)
+              for(int i=0;i<63;i++){uint8_t c=aot_mem.aot_load8(key+i);kb2[i]=c;if(!c)break;}
+          std::printf("[ARCH-CHECK] arch=0x%08X hdr=0x%08X hdr+8=0x%08X empty=%d key_str='%s'\n",
+              arch, arch_hdr, arch_hdr8, (int)arch_empty, kb2);
+          fflush(stdout);
+      }}
       if (arch_empty && key && key >= 0x08800000u && key < 0x0A000000u) {
+          // Read the key string from guest memory
+          char kb[64] = {};
+          for (int i = 0; i < 63; i++) {
+              kb[i] = (char)aot_mem.aot_load8(key + i);
+              if (!kb[i]) break;
+          }
           const std::uint32_t slot     = s_scratch_next;
           s_scratch_next += 96u;
           const std::uint32_t name_ptr = slot + 32u;
           const std::uint32_t sub_data = slot + 64u;
-          // Archive entry: [0]=name_ptr, [4]=sub_data, [8..31]=0
           aot_mem.aot_store32(slot + 0, name_ptr);
           aot_mem.aot_store32(slot + 4, sub_data);
           for (std::uint32_t b = 8; b < 32; b += 4) aot_mem.aot_store32(slot + b, 0u);
-          // Key string copy into name slot
           for (int i = 0; i < 32; i++) {
               std::uint8_t c = aot_mem.aot_load8(key + i);
               aot_mem.aot_store8(name_ptr + i, c);
               if (!c) break;
           }
-          // Fake sub-data struct: all zeros → sub-chunk count at +10 = 0 → loop exits cleanly
           for (std::uint32_t b = 0; b < 32; b += 4) aot_mem.aot_store32(sub_data + b, 0u);
           { static std::uint32_t s_cnt=0; ++s_cnt;
-            char kb[64]={}; for(int i=0;i<63;i++){kb[i]=(char)aot_mem.aot_load8(key+i);if(!kb[i])break;}
-            if (s_cnt <= 8u) std::printf("[ARCH-SYNTH#%u] key=\"%s\" slot=0x%08X sub_data=0x%08X\n", s_cnt, kb, slot, sub_data);
+            if (s_cnt <= 8u) std::printf("[ARCH-SYNTH#%u] key=\"%s\" slot=0x%08X sub_data=0x%08X\n", s_cnt, kb, slot, aot_mem.aot_load32(slot+4));
             std::fflush(stdout);
-            // After all 4 pak entries synthesized, set loading-state flags so FUN_08875364
-            // (loading sequence controller at 0x089D6030) can advance past state 0.
-            // Flags: 0x089D6039 and 0x089D603B — both must be non-zero to unblock state 0.
             if (s_cnt == 4u) {
                 aot_mem.aot_store8(0x089D6039u, 1u);
                 aot_mem.aot_store8(0x089D603Bu, 1u);

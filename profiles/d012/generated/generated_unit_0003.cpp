@@ -13659,6 +13659,13 @@ L_08869AAC:
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
 L_08869AB4:
+    if (ctx.gpr[4] < 0x08000000u) { // guard: a0 is not a valid PSP pointer (e.g. a UID); skip iteration
+        { static bool once=false; if(!once){once=true; std::printf("[08869AB4] invalid a0=0x%08X skipped\n",ctx.gpr[4]); fflush(stdout);} }
+        ctx.gpr[2] = 0u;
+        jump_target = ctx.gpr[31]; ctx.pc = jump_target; local_pc = jump_target;
+        if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+        return;
+    }
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-32));
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(0), ctx.gpr[16]);
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(4), ctx.gpr[17]);
@@ -13670,6 +13677,9 @@ L_08869AB4:
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(20), ctx.gpr[31]);
     ctx.gpr[4] = (aot_mem.aot_load32(ctx.gpr[17] + static_cast<std::uint32_t>(0)));
     ctx.gpr[19] = (0u | 0u);
+    if (ctx.gpr[4] < 0x08000000u) { // guard: sub-ptr is a UID/junk, treat as empty list
+        goto L_08869B3C;
+    }
     ctx.gpr[20] = (aot_mem.aot_load32(ctx.gpr[4] + static_cast<std::uint32_t>(8)));
     ctx.gpr[4] = (static_cast<std::int32_t>(ctx.gpr[19]) < static_cast<std::int32_t>(ctx.gpr[20]) ? 1u : 0u);
     { const bool branch_taken = ctx.gpr[4] == 0u;
@@ -13687,7 +13697,7 @@ L_08869AF0:
 L_08869AFC:
     ctx.gpr[18] = (ctx.gpr[2] | 0u);
     ctx.gpr[4] = (aot_mem.aot_load32(ctx.gpr[18] + static_cast<std::uint32_t>(0)));
-    { const bool branch_taken = ctx.gpr[4] == 0u;
+    { const bool branch_taken = ctx.gpr[4] == 0u || ctx.gpr[4] < 0x08000000u; // guard: skip invalid name ptr
     ctx.gpr[5] = (ctx.gpr[4] | 0u);
       if (branch_taken) {
           goto L_08869B1C;

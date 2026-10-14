@@ -1,4 +1,4 @@
-#include "psprecomp/runtime.hpp"
+﻿#include "psprecomp/runtime.hpp"
 #include "generated_units.hpp"
 #include <bit>
 #include <cmath>
@@ -2990,6 +2990,7 @@ LOCAL_DISPATCH:
     case 0x0893694Cu: goto L_0893694C;
     case 0x0893695Cu: goto L_0893695C;
     case 0x08936968u: goto L_08936968;
+    case 0x089369A8u: goto L_089369A8;
     case 0x089369ACu: goto L_089369AC;
     case 0x089369B8u: goto L_089369B8;
     case 0x089369D4u: goto L_089369D4;
@@ -25384,17 +25385,31 @@ L_08933A24:
 L_08933A2C:
     ctx.gpr[16] = (2206u << 16u);
     ctx.gpr[4] = (aot_mem.aot_load32(ctx.gpr[16] + static_cast<std::uint32_t>(2496)));
+    { static bool s_once=false; if(!s_once){s_once=true; std::printf("[08933A2C] fn_ptr=0x%08X gpr18=0x%08X\n",ctx.gpr[4],ctx.gpr[18]); fflush(stdout);} }
     ctx.gpr[31] = (0x08933A3Cu);
     ctx.gpr[5] = (0u | 1u);
-    if (rt.invoke_chained_direct<&recomp_unit_0014, 14u>(ctx, &aot_mem) && ctx.pc == 0x08933A3Cu) goto L_08933A3C;
-    return;
+    if (ctx.gpr[4] != 0u) {
+        ctx.pc = ctx.gpr[4];
+        (void)rt.invoke_chained_call(ctx, &aot_mem);
+        if (ctx.pc == 0x08933A3Cu) goto L_08933A3C;
+        return;
+    }
+    ctx.gpr[2] = 0u;
+    goto L_08933A3C;
 L_08933A3C:
     ctx.gpr[31] = (0x08933A44u);
     ctx.gpr[4] = (aot_mem.aot_load32(ctx.gpr[16] + static_cast<std::uint32_t>(2496)));
-    if (rt.invoke_chained_direct<&recomp_unit_0014, 14u>(ctx, &aot_mem) && ctx.pc == 0x08933A44u) goto L_08933A44;
-    return;
+    if (ctx.gpr[4] != 0u) {
+        ctx.pc = ctx.gpr[4];
+        (void)rt.invoke_chained_call(ctx, &aot_mem);
+        if (ctx.pc == 0x08933A44u) goto L_08933A44;
+        return;
+    }
+    ctx.gpr[2] = 0u;
+    goto L_08933A44;
 L_08933A44:
     ctx.gpr[4] = (ctx.gpr[18] | 0u);
+    { static bool s_once=false; if(!s_once){s_once=true; std::printf("[08933A44] a0=gpr18=0x%08X\n",ctx.gpr[4]); fflush(stdout);} }
     ctx.gpr[31] = (0x08933A50u);
     ctx.gpr[5] = (0u | 2u);
     if (rt.invoke_chained_direct<&recomp_unit_0003_entry, 3u, 844u, 0x08869908u>(ctx, &aot_mem) && ctx.pc == 0x08933A50u) goto L_08933A50;
@@ -25446,6 +25461,7 @@ L_08933AC0:
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
 L_08933ACC:
+    { static std::uint32_t s_acc = 0u; if (++s_acc <= 3u) std::printf("[08933ACC] entry ra=0x%08X sp=0x%08X a0=0x%08X\n", ctx.gpr[31], ctx.gpr[29], ctx.gpr[4]); }
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-272));
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(256), ctx.gpr[16]);
     ctx.gpr[16] = (ctx.gpr[4] | 0u);
@@ -25481,9 +25497,11 @@ L_08933B14:
     ctx.gpr[31] = (0x08933B38u);
     // nop
     ctx.pc = jump_target;
+    { static std::uint32_t s_b14 = 0u; if (++s_b14 <= 3u) std::printf("[08933B14-CALL] target=0x%08X sp=0x%08X\n", jump_target, ctx.gpr[29]); }
     if (rt.invoke_chained_call(ctx, &aot_mem) && ctx.pc == 0x08933B38u) goto L_08933B38;
     return;
 L_08933B38:
+    { static std::uint32_t s_b38 = 0u; if (++s_b38 <= 3u) std::printf("[08933B38] sp=0x%08X sp+264=0x%08X\n", ctx.gpr[29], aot_mem.aot_load32(ctx.gpr[29] + 264u)); }
     ctx.gpr[16] = (aot_mem.aot_load32(ctx.gpr[29] + static_cast<std::uint32_t>(256)));
     ctx.gpr[17] = (aot_mem.aot_load32(ctx.gpr[29] + static_cast<std::uint32_t>(260)));
     ctx.gpr[31] = (aot_mem.aot_load32(ctx.gpr[29] + static_cast<std::uint32_t>(264)));
@@ -25581,6 +25599,7 @@ L_08933C14:
     ctx.gpr[5] = (0u | 0u);
     goto L_08933ACC;
 L_08933C1C:
+    { static std::uint32_t s_c1c = 0u; if (++s_c1c <= 3u) std::printf("[08933C1C] sp=0x%08X sp+0=0x%08X\n", ctx.gpr[29], aot_mem.aot_load32(ctx.gpr[29])); }
     ctx.gpr[31] = (aot_mem.aot_load32(ctx.gpr[29] + static_cast<std::uint32_t>(0)));
     jump_target = ctx.gpr[31];
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(16));
@@ -25717,8 +25736,8 @@ L_08933D04:
     ctx.gpr[4] = (2206u << 16u);
     ctx.gpr[31] = (0x08933D10u);
     ctx.gpr[4] = (aot_mem.aot_load32(ctx.gpr[4] + static_cast<std::uint32_t>(13068)));
-    if (rt.invoke_chained_direct<&recomp_unit_0014, 14u>(ctx, &aot_mem) && ctx.pc == 0x08933D10u) goto L_08933D10;
-    return;
+    if (ctx.gpr[4] != 0u) { ctx.pc = ctx.gpr[4]; (void)rt.invoke_chained_call(ctx, &aot_mem); if (ctx.pc == 0x08933D10u) goto L_08933D10; return; }
+    ctx.gpr[2] = 0u; goto L_08933D10;
 L_08933D10:
     { const bool branch_taken = 0u == 0u;
     // nop
@@ -25732,13 +25751,13 @@ L_08933D18:
     ctx.gpr[4] = (aot_mem.aot_load32(ctx.gpr[16] + static_cast<std::uint32_t>(2496)));
     ctx.gpr[31] = (0x08933D28u);
     ctx.gpr[5] = (0u | 0u);
-    if (rt.invoke_chained_direct<&recomp_unit_0014, 14u>(ctx, &aot_mem) && ctx.pc == 0x08933D28u) goto L_08933D28;
-    return;
+    if (ctx.gpr[4] != 0u) { ctx.pc = ctx.gpr[4]; (void)rt.invoke_chained_call(ctx, &aot_mem); if (ctx.pc == 0x08933D28u) goto L_08933D28; return; }
+    ctx.gpr[2] = 0u; goto L_08933D28;
 L_08933D28:
     ctx.gpr[31] = (0x08933D30u);
     ctx.gpr[4] = (aot_mem.aot_load32(ctx.gpr[16] + static_cast<std::uint32_t>(2496)));
-    if (rt.invoke_chained_direct<&recomp_unit_0014, 14u>(ctx, &aot_mem) && ctx.pc == 0x08933D30u) goto L_08933D30;
-    return;
+    if (ctx.gpr[4] != 0u) { ctx.pc = ctx.gpr[4]; (void)rt.invoke_chained_call(ctx, &aot_mem); if (ctx.pc == 0x08933D30u) goto L_08933D30; return; }
+    ctx.gpr[2] = 0u; goto L_08933D30;
 L_08933D30:
     { const bool branch_taken = 0u == 0u;
     // nop
@@ -31469,6 +31488,8 @@ L_08936968:
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
+L_089369A8:
+    ctx.gpr[9] = (ctx.gpr[9] + static_cast<std::uint32_t>(1));
 L_089369AC:
     ctx.gpr[8] = (static_cast<std::uint32_t>(static_cast<std::int32_t>(static_cast<std::int8_t>(aot_mem.aot_load8(ctx.gpr[9] + static_cast<std::uint32_t>(0))))));
     { const bool branch_taken = ctx.gpr[8] != 0u;
@@ -55907,6 +55928,7 @@ void register_generated_unit_9(Runtime &runtime) {
     runtime.register_function(0x0893694Cu, &recomp_unit_0009, "recomp_unit_0009");
     runtime.register_function(0x0893695Cu, &recomp_unit_0009, "recomp_unit_0009");
     runtime.register_function(0x08936968u, &recomp_unit_0009, "recomp_unit_0009");
+    runtime.register_function(0x089369A8u, &recomp_unit_0009, "recomp_unit_0009");
     runtime.register_function(0x089369ACu, &recomp_unit_0009, "recomp_unit_0009");
     runtime.register_function(0x089369B8u, &recomp_unit_0009, "recomp_unit_0009");
     runtime.register_function(0x089369D4u, &recomp_unit_0009, "recomp_unit_0009");

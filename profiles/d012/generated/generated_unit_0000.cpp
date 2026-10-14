@@ -6042,16 +6042,39 @@ L_08804264:
       goto L_08804270;
     }
 L_08804270:
+    { static std::uint32_t s_270 = 0u; if (++s_270 <= 5u) std::printf("[L08804270] iter=%u s16=0x%08X\n", s_270, ctx.gpr[16]); }
     ctx.gpr[31] = (0x08804278u);
     ctx.gpr[4] = (ctx.gpr[16] + 0u);
-    if (rt.invoke_chained_direct<&recomp_unit_0009_entry, 9u, 2451u, 0x08934A48u>(ctx, &aot_mem) && ctx.pc == 0x08804278u) goto L_08804278;
+    // Pump until scene_tick returns to 0x08804278.  Budget=2048 is not enough
+    // for a full frame so we keep re-entering via invoke_chained_call.
+    {
+        (void)rt.invoke_chained_direct<&recomp_unit_0009_entry, 9u, 2451u, 0x08934A48u>(ctx, &aot_mem);
+        if (ctx.pc == 0x08804278u) goto L_08804278;
+        static std::uint32_t s_pump = 0u;
+        for (int _retry = 0; _retry < 131072; ++_retry) {
+            (void)rt.invoke_chained_call(ctx, &aot_mem);
+            if (ctx.pc == 0x08804278u) goto L_08804278;
+            if ((_retry & 0xFFF) == 0 && ++s_pump <= 4u)
+                std::printf("[PUMP270] retry=%d pc=0x%08X\n", _retry, ctx.pc);
+        }
+        { static std::uint32_t s_give = 0u; if (++s_give <= 3u) std::printf("[PUMP270] gave up pc=0x%08X\n", ctx.pc); }
+    }
     return;
 L_08804278:
+    { static std::uint32_t s_278 = 0u; if (++s_278 <= 5u) std::printf("[L08804278] iter=%u\n", s_278); }
     ctx.gpr[31] = (0x08804280u);
     ctx.gpr[4] = (ctx.gpr[2] + 0u);
-    if (rt.invoke_chained_direct<&recomp_unit_0014_entry, 14u, 333u, 0x089C6000u>(ctx, &aot_mem) && ctx.pc == 0x08804280u) goto L_08804280;
+    // ExitDeleteThread must return to 0x08804280; budget pump in case it's deep.
+    (void)rt.invoke_chained_direct<&recomp_unit_0014_entry, 14u, 333u, 0x089C6000u>(ctx, &aot_mem);
+    if (ctx.pc == 0x08804280u) goto L_08804280;
+    for (int _r2 = 0; _r2 < 65536; ++_r2) {
+        (void)rt.invoke_chained_call(ctx, &aot_mem);
+        if (ctx.pc == 0x08804280u) goto L_08804280;
+    }
+    { static std::uint32_t s_278f = 0u; if (++s_278f <= 3u) std::printf("[L08804278-MISS] pc=0x%08X\n", ctx.pc); }
     return;
 L_08804280:
+    { static std::uint32_t s_280 = 0u; if (++s_280 <= 3u) std::printf("[L08804280] iter=%u\n", s_280); }
     // nop
     goto L_08804270;
 L_08804288:

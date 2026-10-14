@@ -131,7 +131,7 @@ All PSP import stubs cluster in unit 14 (`0x089C4040`–`0x089C6040`). The gener
 
 ---
 
-## Current status (as of 2026-10-14, session 6)
+## Current status (as of 2026-10-15, session 8)
 
 **Rendering gate `DAT_089D69DC` is now open (dc=01) from frame 2 onward.** ✅
 **`DAT_089D69E0` (render object ptr) is now set to `0x08C13A94` by `FUN_088769CC`.** ✅
@@ -142,7 +142,12 @@ All PSP import stubs cluster in unit 14 (`0x089C4040`–`0x089C6040`). The gener
 **`FUN_08869AB4` null deref fixed (not-found path instead of self-loop).** ✅
 **Menu MPK files extracted from PACKAGE.BIN, game proceeds past archive init.** ✅
 **Init sequence completes. Task scheduler runs 8+ tasks per frame.** ✅
-**Current blocker: display task `FUN_08872F08` — crash at `0x0C000004` (VRAM write-combine alias not mapped).** ❌
+**Render chain (`DAT_09AF719C`) confirmed written with `0x08C15FD0` by `FUN_089AD204` (RCHAIN-INSERT).** ✅
+**VCB display list executor picks up the correct render chain pointer.** ✅
+**GE vertex address lookup extended to cover PSP RAM range `0x08000000–0x0A000000`.** ✅
+**`general_archive/main/main.bin` (1.2 MB) confirmed loaded into guest RAM at `0x09644A80`.** ✅
+**Root cause of zero pixels identified: ARCH-SYNTH fake entries set sub-chunk count = 0, blocking all geometry loads.** ❌
+**Current blocker: archive object not populated from `main.bin` → ARCH-SYNTH fires → sub-chunks=0 → no vertex data written.** ❌
 
 ### What was done this session (session 4)
 
@@ -182,6 +187,22 @@ All PSP import stubs cluster in unit 14 (`0x089C4040`–`0x089C6040`). The gener
 | `0x089389E0` unregistered jump-table target | Added stub + dispatch case in unit 9 | `generated_unit_0009.cpp` |
 | `0x001ECF3B` unregistered (bad fn ptr) | Guard at `L_0886313C` skips call if outside RAM | `generated_unit_0002.cpp` |
 | `FUN_08872F08` VRAM read crash | Stubbed — reads `0x0A000000` (VRAM mirror), unsupported | `generated_unit_0003.cpp` |
+
+### Session 8 findings
+
+#### Render pipeline trace
+- Confirmed render chain at `DAT_09AF719C` is written with node `0x08C15FD0` by `FUN_089AD204` (RCHAIN-INSERT)
+- Frame ordering: `sceDisplaySetFrameBuf` GE exec fires BEFORE RCHAIN-INSERT (chain empty), VCB exec fires AFTER (chain populated — correct path)
+- GE DL at node `0x08C15FD0`: first word `0x5C808080` = JUMP opcode targeting `0x08808080` (inside guest RAM)
+- `0x08808080` is all zeros — vertex data never written there
+- Fixed GE vertex address lookup to also cover PSP RAM range `0x08000000–0x0A000000` (was only checking VRAM)
+
+#### Root cause of zero pixels (ARCH-SYNTH sub-chunk count)
+- Traced full code path: `FUN_088D2980` → ARCH-SYNTH intercept → returns fake entry with `sub_data+10 = 0`
+- `sub_data+10` is the sub-chunk count; geometry load loop exits immediately when count=0
+- `main.bin` IS loaded to `0x09644A80` via `FUN_08862854`, but the archive *object* (struct pointed to by `gpr[4]`) has `hdr+8 = 0` (empty entry table)
+- The archive object's index table is not populated — the parsing/init function that should scan `main.bin` and build the object table hasn't run, or ran before `main.bin` was loaded
+- **Next step**: trace why archive object at `gpr[4]` remains empty despite `main.bin` being loaded; find and trigger the init function that builds the entry table
 
 ### Session 6 crash fixes / investigation
 

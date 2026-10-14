@@ -12,6 +12,7 @@ namespace d012 {
 // mem_size:   size of the guest RAM flat view.
 void ge_exec(const std::uint32_t *dl, const std::uint32_t *dl_end,
              void *vram, std::size_t vram_size,
-             const void *mem, std::size_t mem_size);
+             const void *mem, std::size_t mem_size,
+             std::uint32_t initial_base_addr = 0u);
 
 } // namespace d012
