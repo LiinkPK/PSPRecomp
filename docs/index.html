@@ -234,7 +234,7 @@
         tasks: [
           { id: "p1-t1", name: "sceKernelCreateThread, StartThread, ExitThread, GetThreadId",  note: "Basic thread lifecycle mechanics",       done: true  },
           { id: "p1-t2", name: "sceKernelAllocPartitionMemory / GetBlockHeadAddr",              note: "Heap memory allocation",                  done: true  },
-          { id: "p1-t3", name: "sceKernelSetCompiledSdkVersion variants",                        note: "Returns 0 — no-op sufficient",            done: true  },
+          { id: "p1-t3", name: "sceKernelSetCompiledSdkVersion variants",                        note: "Returns 0: no-op sufficient",            done: true  },
           { id: "p1-t4", name: "sceKernelGetSystemTimeLow",                                      note: "Returns host system clock tick",           done: true  },
           { id: "p1-t5", name: "sceKernelCreateCallback, semaphores, event flags",              note: "Synchronization primitives",               done: true  },
         ]
@@ -268,7 +268,7 @@
           { id: "p3-t2", name: "GE command interpreter skeleton (CLEAR, 2D sprites, flat-color)", note: "Software rasterizer handles basic 2D",    done: true  },
           { id: "p3-t3", name: "Texture sampling — RGB565, RGBA8888, DXT, CLUT",               note: "Block-compressed + index-color formats",    done: true  },
           { id: "p3-t4", name: "First non-zero pixel output",                                    note: "DAT_09AF719C render-chain root still null", done: false },
-          { id: "p3-t5", name: "Translate display lists to Vulkan / DX12 / OpenGL",             note: "GPU backend — after software raster proven", done: false },
+          { id: "p3-t5", name: "Translate display lists to Vulkan / DX12 / OpenGL",             note: "GPU backend: after software raster proven", done: false },
           { id: "p3-t6", name: "Validate GE interpreter against PPSSPP frame dumps",            note: "Frame-by-frame comparison milestone",       done: false },
         ]
       },
