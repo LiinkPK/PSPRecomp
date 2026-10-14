@@ -34962,6 +34962,7 @@ L_088752DC:
     ctx.gpr[4] = (aot_mem.aot_load32(ctx.gpr[4] + static_cast<std::uint32_t>(28972)));
     ctx.gpr[31] = (0x088752F4u);
     ctx.gpr[18] = (ctx.gpr[17] + static_cast<std::uint32_t>(304));
+    { static bool once=false; if(!once){once=true; std::printf("[8752F0] FUN_088AD994 a0=0x%08X a1=0x%08X(out)\n",ctx.gpr[4],ctx.gpr[18]); std::fflush(stdout);} }
     if (rt.invoke_chained_direct<&recomp_unit_0005_entry, 5u, 1757u, 0x088AD994u>(ctx, &aot_mem) && ctx.pc == 0x088752F4u) goto L_088752F4;
     return;
 L_088752F4:
@@ -34969,6 +34970,11 @@ L_088752F4:
     ctx.gpr[5] = (ctx.gpr[2] | 0u);
     ctx.gpr[31] = (0x08875304u);
     ctx.gpr[6] = (0u | 128u);
+    // Guard: skip memcpy if src is not a valid PSP RAM pointer (lang string table not loaded)
+    if (ctx.gpr[5] < 0x08800000u || ctx.gpr[5] >= 0x0A000000u) {
+        static bool once=false; if(!once){once=true; std::printf("[8752F4] SKIP memcpy: src=0x%08X not valid PSP RAM\n",ctx.gpr[5]); std::fflush(stdout);}
+        goto L_08875304;
+    }
     if (rt.invoke_chained_direct<&recomp_unit_0009_entry, 9u, 2767u, 0x08935BB4u>(ctx, &aot_mem) && ctx.pc == 0x08875304u) goto L_08875304;
     return;
 L_08875304:
@@ -35022,6 +35028,7 @@ L_08875364:
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(0), ctx.gpr[16]);
     ctx.gpr[16] = (2205u << 16u);
     ctx.gpr[4] = (aot_mem.aot_load32(ctx.gpr[16] + static_cast<std::uint32_t>(24624)));
+    { static std::uint32_t s_prev=0xFFFFFFFFu; if(ctx.gpr[4]!=s_prev){s_prev=ctx.gpr[4]; std::printf("[8875364] state=%u flags6039=0x%02X flags603B=0x%02X\n",(unsigned)ctx.gpr[4],(unsigned)aot_mem.aot_load8(0x089D6039u),(unsigned)aot_mem.aot_load8(0x089D603Bu)); std::fflush(stdout);} }
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(4), ctx.gpr[17]);
     ctx.gpr[5] = (ctx.gpr[4] < static_cast<std::uint32_t>(6) ? 1u : 0u);
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(8), ctx.gpr[31]);
@@ -35199,6 +35206,7 @@ L_08875470:
       goto L_0887547C;
     }
 L_0887547C:
+    { static bool once=false; if(!once){once=true; std::printf("[8875364-s3] state=3 reached L_0887547C\n"); std::fflush(stdout);} }
     { const bool branch_taken = 0u == 0u;
     ctx.gpr[17] = (0u | 1u);
       if (branch_taken) {
@@ -35233,6 +35241,7 @@ L_088754A0:
     if (rt.invoke_chained_direct<&recomp_unit_0006_entry, 6u, 1779u, 0x088CE2A8u>(ctx, &aot_mem) && ctx.pc == 0x088754A8u) goto L_088754A8;
     return;
 L_088754A8:
+    { static std::uint32_t s_cnt=0; if(++s_cnt<=3u) std::printf("[8754A8] FUN_088CE2A8 returned 0x%08X\n",ctx.gpr[2]); std::fflush(stdout); }
     ctx.gpr[31] = (0x088754B0u);
     ctx.gpr[4] = (ctx.gpr[2] | 0u);
     if (rt.invoke_chained_direct<&recomp_unit_0006_entry, 6u, 1739u, 0x088CE080u>(ctx, &aot_mem) && ctx.pc == 0x088754B0u) goto L_088754B0;

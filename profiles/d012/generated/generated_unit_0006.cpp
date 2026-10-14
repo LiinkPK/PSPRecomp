@@ -29663,6 +29663,63 @@ L_088D2A7C:
 L_088D2A84:
     ctx.gpr[31] = (0x088D2A8Cu);
     ctx.gpr[4] = (aot_mem.aot_load32(ctx.gpr[29] + static_cast<std::uint32_t>(40)));
+    { // If the lang-archive has no entries (stub main_lang.bin), synthesize a fake entry.
+      // Scratch layout per slot (96 bytes at 0x09FE0000+):
+      //   [0..3]   entry[0] = name_ptr (slot+32)
+      //   [4..7]   entry[4] = sub_data ptr (slot+64) — fake sub-data struct
+      //   [8..31]  zeros
+      //   [32..63] key string (null-terminated)
+      //   [64..95] fake sub-data struct (all zeros):
+      //              +10 (u16) = 0 → sub-chunk count=0 → inner loop exits immediately
+      //              all other fields zero (never reached)
+      static std::uint32_t s_scratch_next = 0x09FE0000u;
+      const std::uint32_t arch = ctx.gpr[4];
+      const std::uint32_t key  = ctx.gpr[5];
+      bool arch_empty = false;
+      if (arch && arch >= 0x08800000u && arch < 0x0A000000u) {
+          const std::uint32_t hdr = aot_mem.aot_load32(arch + 0);
+          if (hdr && hdr >= 0x08800000u && hdr < 0x0A000000u) {
+              arch_empty = (aot_mem.aot_load32(hdr + 8) == 0u);
+          } else {
+              arch_empty = true;
+          }
+      }
+      if (arch_empty && key && key >= 0x08800000u && key < 0x0A000000u) {
+          const std::uint32_t slot     = s_scratch_next;
+          s_scratch_next += 96u;
+          const std::uint32_t name_ptr = slot + 32u;
+          const std::uint32_t sub_data = slot + 64u;
+          // Archive entry: [0]=name_ptr, [4]=sub_data, [8..31]=0
+          aot_mem.aot_store32(slot + 0, name_ptr);
+          aot_mem.aot_store32(slot + 4, sub_data);
+          for (std::uint32_t b = 8; b < 32; b += 4) aot_mem.aot_store32(slot + b, 0u);
+          // Key string copy into name slot
+          for (int i = 0; i < 32; i++) {
+              std::uint8_t c = aot_mem.aot_load8(key + i);
+              aot_mem.aot_store8(name_ptr + i, c);
+              if (!c) break;
+          }
+          // Fake sub-data struct: all zeros → sub-chunk count at +10 = 0 → loop exits cleanly
+          for (std::uint32_t b = 0; b < 32; b += 4) aot_mem.aot_store32(sub_data + b, 0u);
+          { static std::uint32_t s_cnt=0; ++s_cnt;
+            char kb[64]={}; for(int i=0;i<63;i++){kb[i]=(char)aot_mem.aot_load8(key+i);if(!kb[i])break;}
+            if (s_cnt <= 8u) std::printf("[ARCH-SYNTH#%u] key=\"%s\" slot=0x%08X sub_data=0x%08X\n", s_cnt, kb, slot, sub_data);
+            std::fflush(stdout);
+            // After all 4 pak entries synthesized, set loading-state flags so FUN_08875364
+            // (loading sequence controller at 0x089D6030) can advance past state 0.
+            // Flags: 0x089D6039 and 0x089D603B — both must be non-zero to unblock state 0.
+            if (s_cnt == 4u) {
+                aot_mem.aot_store8(0x089D6039u, 1u);
+                aot_mem.aot_store8(0x089D603Bu, 1u);
+                std::printf("[ARCH-SYNTH] Injected loading flags 0x089D6039=1 0x089D603B=1\n");
+                std::fflush(stdout);
+            }
+          }
+          ctx.gpr[2] = slot;
+          ctx.pc = 0x088D2A8Cu;
+          goto L_088D2A8C;
+      }
+    }
     if (rt.invoke_chained_direct<&recomp_unit_0003_entry, 3u, 876u, 0x08869AB4u>(ctx, &aot_mem) && ctx.pc == 0x088D2A8Cu) goto L_088D2A8C;
     return;
 L_088D2A8C:

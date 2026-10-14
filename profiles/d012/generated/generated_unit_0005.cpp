@@ -21713,6 +21713,7 @@ L_088AD988:
     return;
 L_088AD994:
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-16));
+    { static bool once=false; if(!once){once=true; std::uint32_t ptr=aot_mem.aot_load32(ctx.gpr[4]+3808); std::printf("[AD994] a0=0x%08X ptr_at_a0+3808=0x%08X\n",ctx.gpr[4],ptr); std::fflush(stdout);} }
     ctx.gpr[4] = (aot_mem.aot_load32(ctx.gpr[4] + static_cast<std::uint32_t>(3808)));
     ctx.gpr[5] = (0u | 0u);
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(0), ctx.gpr[31]);
