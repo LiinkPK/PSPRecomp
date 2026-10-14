@@ -1,5 +1,6 @@
 ﻿#include "psprecomp/runtime.hpp"
 #include "generated_units.hpp"
+#include "../host/d012_profile.hpp"
 #include <bit>
 #include <cmath>
 #include <cstdint>
@@ -10231,6 +10232,27 @@ L_08846A3C:
       goto L_08846A60;
     }
 L_08846A60:
+    {
+        // Restore jump table if corrupted by the data-init copy at 0x08804160.
+        constexpr std::uint32_t TBL_BASE = (2205u << 16u) - 30272u; // 0x089C89C0
+        std::uint32_t tbl0 = aot_mem.aot_load32(TBL_BASE);
+        if (tbl0 < 0x08800000u || tbl0 >= 0x09F00000u) {
+            if (d012::g_jump_table_snapshot_valid) {
+                static bool once_print = false;
+                if (!once_print) { once_print = true;
+                    std::printf("[TBL-RESTORE] Restoring corrupted table (was 0x%08X). Entries:\n", tbl0);
+                    for (int i = 0; i < 12; ++i)
+                        std::printf("  [%2d] = 0x%08X\n", i, d012::g_jump_table_snapshot[i]);
+                    fflush(stdout);
+                }
+                for (int i = 0; i < 12; ++i)
+                    aot_mem.aot_store32(TBL_BASE + static_cast<std::uint32_t>(i * 4),
+                                        d012::g_jump_table_snapshot[i]);
+            } else {
+                std::printf("[TBL-RESTORE] No snapshot available (tbl0=0x%08X)\n", tbl0); fflush(stdout);
+            }
+        }
+    }
     ctx.gpr[4] = (ctx.gpr[4] << 2u);
     ctx.gpr[1] = (2205u << 16u);
     ctx.gpr[1] = (ctx.gpr[1] + ctx.gpr[4]);

@@ -22,6 +22,10 @@ void hle_run_ctors(psprecomp::Runtime &rt, const psprecomp::Elf32Image &elf);
 // Game root directory for PSP path translation
 extern std::string g_game_root;
 
+// Jump table snapshot: 12 entries saved by INIT-DONE hook, restored when corrupted.
+extern std::uint32_t g_jump_table_snapshot[12];
+extern bool          g_jump_table_snapshot_valid;
+
 // File I/O state — used from generated_unit_0014.cpp
 std::uint32_t io_open(const std::string &psp_path, std::uint32_t flags);
 std::int32_t  io_read(std::uint32_t fd, void *buf, std::uint32_t size);

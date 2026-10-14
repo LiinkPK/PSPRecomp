@@ -21872,7 +21872,9 @@ L_088CE288:
     return;
 L_088CE2A0:
     jump_target = ctx.gpr[31];
-    ctx.gpr[2] = (aot_mem.aot_load8(ctx.gpr[4] + static_cast<std::uint32_t>(0)));
+    // Stub: GE completes instantly; always report render-object ready (byte+0=1).
+    // On PSP this byte is set by the GE completion callback; our HLE fires no callback.
+    ctx.gpr[2] = 1u;
     ctx.pc = jump_target;
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }

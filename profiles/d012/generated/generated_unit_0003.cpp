@@ -35242,6 +35242,14 @@ L_088754A0:
     return;
 L_088754A8:
     { static std::uint32_t s_cnt=0; if(++s_cnt<=3u) std::printf("[8754A8] FUN_088CE2A8 returned 0x%08X\n",ctx.gpr[2]); std::fflush(stdout); }
+    // ARCH-SYNTH: state 3 is a GE-callback wait state — advance to 4 after render object handoff.
+    { constexpr std::uint32_t STATE_PTR = (2205u << 16u) + 24624u; // 0x089D6030
+      std::uint32_t cur_state = aot_mem.aot_load32(STATE_PTR);
+      if (cur_state == 3u) {
+          aot_mem.aot_store32(STATE_PTR, 4u);
+          static bool once=false; if(!once){once=true; std::printf("[SYNTH-S3->4] advanced loading state 3->4\n"); fflush(stdout);}
+      }
+    }
     ctx.gpr[31] = (0x088754B0u);
     ctx.gpr[4] = (ctx.gpr[2] | 0u);
     if (rt.invoke_chained_direct<&recomp_unit_0006_entry, 6u, 1739u, 0x088CE080u>(ctx, &aot_mem) && ctx.pc == 0x088754B0u) goto L_088754B0;
@@ -38164,7 +38172,8 @@ L_08876F58:
 L_08876F64:
     ctx.gpr[4] = (2205u << 16u);
     aot_mem.aot_store32(ctx.gpr[4] + static_cast<std::uint32_t>(27104), ctx.gpr[16]);
-    std::printf("[769CC] DAT_089D69E0 <- 0x%08X\n", ctx.gpr[16]); fflush(stdout);
+    { std::uint32_t tbl0 = aot_mem.aot_load32(0x089C89C0u);
+      std::printf("[769CC] DAT_089D69E0 <- 0x%08X  table[0]=0x%08X\n", ctx.gpr[16], tbl0); fflush(stdout); }
     ctx.gpr[6] = (2241u << 16u);
     ctx.gpr[4] = (aot_mem.aot_load32(ctx.gpr[6] + static_cast<std::uint32_t>(14976)));
     ctx.gpr[22] = (aot_mem.aot_load32(ctx.gpr[29] + static_cast<std::uint32_t>(24)));
@@ -54081,9 +54090,17 @@ L_0888251C:
     ctx.gpr[5] = (aot_mem.aot_load32(ctx.gpr[19] + static_cast<std::uint32_t>(0)));
     aot_mem.aot_store32(ctx.gpr[19] + static_cast<std::uint32_t>(72), ctx.gpr[18]);
     { static std::uint32_t s_dispatch_count = 0u;
+      static std::uint32_t s_last_tbl0 = 0u;
+      static std::uint32_t s_last_fn   = 0u;
       ++s_dispatch_count;
+      std::uint32_t cur_tbl0 = aot_mem.aot_load32(0x089C89C0u);
+      if (cur_tbl0 != s_last_tbl0 && s_last_fn != 0u) {
+          std::printf("[TASK-TBL-CHG] fn=0x%08X changed table[0]: 0x%08X -> 0x%08X\n", s_last_fn, s_last_tbl0, cur_tbl0); std::fflush(stdout);
+      }
+      s_last_tbl0 = cur_tbl0;
+      s_last_fn   = ctx.gpr[5];
       if (s_dispatch_count <= 5u || (s_dispatch_count & 0xFFFu) == 0u) {
-          std::printf("[TASK] dispatch #%u task=0x%08X fn=0x%08X\n", s_dispatch_count, ctx.gpr[19], ctx.gpr[5]);
+          std::printf("[TASK] dispatch #%u task=0x%08X fn=0x%08X (tbl0=0x%08X)\n", s_dispatch_count, ctx.gpr[19], ctx.gpr[5], cur_tbl0);
           std::fflush(stdout);
       }
     }

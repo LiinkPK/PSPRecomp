@@ -21,6 +21,10 @@ namespace d012 {
 // Game root directory set from main.cpp before any file I/O
 std::string g_game_root;
 
+// Jump table snapshot for restoring after data-init copy clobbers BSS
+std::uint32_t g_jump_table_snapshot[12] = {};
+bool          g_jump_table_snapshot_valid = false;
+
 namespace {
 
 // Per-VA dispatch table populated before the first run

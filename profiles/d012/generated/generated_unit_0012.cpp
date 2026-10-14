@@ -1,5 +1,6 @@
 #include "psprecomp/runtime.hpp"
 #include "generated_units.hpp"
+#include "../host/d012_profile.hpp"
 #include <bit>
 #include <cmath>
 #include <cstdint>
@@ -29391,9 +29392,21 @@ L_0899321C:
     ctx.gpr[31] = (0x08993224u);
     // nop
     ctx.pc = jump_target;
-    printf("[INIT] calling function pointer 0x%08X\n", jump_target);
-    if (rt.invoke_chained_call(ctx, &aot_mem) && ctx.pc == 0x08993224u) goto L_08993224;
-    printf("[INIT] invoke_chained_call returned false for 0x%08X\n", jump_target);
+    { std::uint32_t tbl0_before = aot_mem.aot_load32(0x089C89C0u);
+      // Save snapshot whenever the table has valid PSP addresses.
+      if (!d012::g_jump_table_snapshot_valid && tbl0_before >= 0x08800000u && tbl0_before < 0x09F00000u) {
+          for (int _i = 0; _i < 12; ++_i)
+              d012::g_jump_table_snapshot[_i] = aot_mem.aot_load32(0x089C89C0u + static_cast<std::uint32_t>(_i*4));
+          d012::g_jump_table_snapshot_valid = true;
+          printf("[INIT-SNAP] Saved jump table before fn=0x%08X, entry[0]=0x%08X\n", jump_target, tbl0_before); fflush(stdout);
+      }
+      printf("[INIT] calling function pointer 0x%08X (table[0]=0x%08X)\n", jump_target, tbl0_before); fflush(stdout);
+      if (rt.invoke_chained_call(ctx, &aot_mem) && ctx.pc == 0x08993224u) {
+          std::uint32_t tbl0_after = aot_mem.aot_load32(0x089C89C0u);
+          if (tbl0_after != tbl0_before) printf("[INIT] ** table[0] changed 0x%08X -> 0x%08X by fn 0x%08X\n", tbl0_before, tbl0_after, jump_target); fflush(stdout);
+          goto L_08993224;
+      }
+      printf("[INIT] invoke_chained_call returned false for 0x%08X\n", jump_target); }
     return;
 L_08993224:
     ctx.gpr[16] = (ctx.gpr[16] + static_cast<std::uint32_t>(8));
@@ -29410,6 +29423,17 @@ L_08993234:
     ctx.gpr[31] = (aot_mem.aot_load32(ctx.gpr[29] + static_cast<std::uint32_t>(12)));
     jump_target = ctx.gpr[31];
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(16));
+    { constexpr std::uint32_t TBL = 0x089C89C0u;
+      std::uint32_t tbl0 = aot_mem.aot_load32(TBL);
+      if (tbl0 >= 0x08800000u && tbl0 < 0x09F00000u) {
+          for (int i = 0; i < 12; ++i)
+              d012::g_jump_table_snapshot[i] = aot_mem.aot_load32(TBL + static_cast<std::uint32_t>(i*4));
+          d012::g_jump_table_snapshot_valid = true;
+          printf("[INIT-DONE] Saved jump table, entry[0]=0x%08X, returning to 0x%08X\n", tbl0, jump_target);
+      } else {
+          printf("[INIT-DONE] WARNING: table already corrupt at INIT-DONE! table[0]=0x%08X\n", tbl0);
+      }
+      fflush(stdout); }
     ctx.pc = jump_target;
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
