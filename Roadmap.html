@@ -264,11 +264,11 @@
         badgeBg: "bg-tokyo-accent/15 text-tokyo-accent border-tokyo-accent/30",
         summary: "Initialize core thread scheduling, memory allocation, and basic OS callbacks.",
         tasks: [
-          { id: "p1-t1", name: "sceKernelCreateThread, StartThread, ExitThread, GetThreadId", note: "Basic thread lifecycle mechanics" },
-          { id: "p1-t2", name: "sceKernelAllocPartitionMemory / GetBlockHeadAddr", note: "Heap memory allocation" },
-          { id: "p1-t3", name: "sceKernelSetCompiledSdkVersion variants", note: "Can simple return 0" },
-          { id: "p1-t4", name: "sceKernelGetSystemTimeLow", note: "Return host system clock tick" },
-          { id: "p1-t5", name: "sceKernelCreateCallback, semaphores, event flags", note: "Synchronization primitives" }
+          { id: "p1-t1", name: "sceKernelCreateThread, StartThread, ExitThread, GetThreadId", note: "Basic thread lifecycle mechanics", done: true },
+          { id: "p1-t2", name: "sceKernelAllocPartitionMemory / GetBlockHeadAddr", note: "Heap memory allocation", done: true  },
+          { id: "p1-t3", name: "sceKernelSetCompiledSdkVersion variants", note: "Can simple return 0", done: true  },
+          { id: "p1-t4", name: "sceKernelGetSystemTimeLow", note: "Return host system clock tick", done: true  },
+          { id: "p1-t5", name: "sceKernelCreateCallback, semaphores, event flags", note: "Synchronization primitives", done: true  }
         ]
       },
       {
@@ -282,8 +282,8 @@
         badgeBg: "bg-tokyo-green/15 text-tokyo-green border-tokyo-green/30",
         summary: "Unlocks asset loading and bypasses early initialization crashes.",
         tasks: [
-          { id: "p2-t1", name: "sceIoOpen, sceIoRead, sceIoClose, sceIoLseek", note: "Standard PSP file system primitives" },
-          { id: "p2-t2", name: "Map PSP file paths (disc0:/PSP_GAME/USRDIR/)", note: "Map PSP Virtual Paths to local directory structure" },
+          { id: "p2-t1", name: "sceIoOpen, sceIoRead, sceIoClose, sceIoLseek", note: "Standard PSP file system primitives", done: true  },
+          { id: "p2-t2", name: "Map PSP file paths (disc0:/PSP_GAME/USRDIR/)", note: "Map PSP Virtual Paths to local directory structure", done: true  },
           { id: "p2-t3", name: "Bypass early asset crashes", note: "Validate game reads texture & data archives without hanging" }
         ]
       },
@@ -298,7 +298,7 @@
         badgeBg: "bg-tokyo-orange/15 text-tokyo-orange border-tokyo-orange/30",
         summary: "The main challenge: Parse PSP GE display lists and translate to host draw calls.",
         tasks: [
-          { id: "p3-t1", name: "Understand sceGu calls as recompiled MIPS code", note: "Game code builds display lists directly in RAM" },
+          { id: "p3-t1", name: "Understand sceGu calls as recompiled MIPS code", note: "Game code builds display lists directly in RAM", done: true  },
           { id: "p3-t2", name: "Emulate GE Command Processor", note: "Parse RAM display list packets" },
           { id: "p3-t3", name: "Translate Display Lists to Vulkan / DX12 / OpenGL", note: "Map PSP matrices, vertices, & textures to host pipeline" },
           { id: "p3-t4", name: "Validate GE Interpreter against PPSSPP frame dumps", note: "Dump buffer before writing full Vulkan backend" }
