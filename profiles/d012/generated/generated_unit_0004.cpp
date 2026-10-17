@@ -16110,6 +16110,7 @@ L_0888B210:
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
 L_0888B21C:
+    { static std::uint32_t s_trace=0; if (++s_trace <= 8u) { std::printf("[SCENE-MGR-ENTRY] 0888B21C a0=0x%08X a1=0x%08X a2=0x%08X\n", ctx.gpr[4], ctx.gpr[5], ctx.gpr[6]); fflush(stdout); } }
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-48));
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(16), ctx.gpr[16]);
     ctx.gpr[16] = (ctx.gpr[4] | 0u);
@@ -50724,6 +50725,7 @@ L_088A2640:
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
 L_088A2664:
+    { static std::uint32_t s_trace=0; if (++s_trace <= 8u) { std::printf("[SCENE-MGR-TRANSITION] 088A2664 a0=0x%08X a1=0x%08X f12=%08X\n", ctx.gpr[4], ctx.gpr[5], std::bit_cast<std::uint32_t>(ctx.fpr[12])); fflush(stdout); } }
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-32));
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(0), std::bit_cast<std::uint32_t>(ctx.fpr[20]));
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(4), ctx.gpr[16]);

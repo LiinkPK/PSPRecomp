@@ -49333,7 +49333,8 @@ L_088DDDC0:
     // host/random pointer.  Preserve the original parser flow by completing
     // the current package without emitting that one record.
     if (ctx.gpr[16] < 0x08800000u || ctx.gpr[16] >= 0x0A000000u ||
-        ctx.gpr[19] < 0x08800000u || ctx.gpr[19] >= 0x0A000000u) {
+        ctx.gpr[19] < 0x08800000u || ctx.gpr[19] >= 0x0A000000u ||
+        ctx.gpr[20] >= 0x10000000u) {
         std::printf("[MPK-RECORD-SKIP] invalid destination s0=0x%08X s3=0x%08X\\n", ctx.gpr[16], ctx.gpr[19]);
         goto L_088DDE00;
     }

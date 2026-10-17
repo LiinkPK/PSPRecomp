@@ -874,7 +874,7 @@ void register_hle(psprecomp::Runtime &rt) {
     // FUN_0887801C: subsystem registry — inits 40+ subsystems and stores their pointers.
     // All constructors (func_0x089DDxxx, func_0x08ACxxxx etc) are uncompiled gaps.
     // HLE: skip all constructors, just write the pointer assignments the game reads later.
-    rt.register_function(0x0887801Cu, [](psprecomp::Runtime &rt2, psprecomp::AllegrexContext &ctx) {
+    rt.register_function(0x0F87801Cu, [](psprecomp::Runtime &rt2, psprecomp::AllegrexContext &ctx) {
         static bool s_once = false;
         if (!s_once) { s_once = true; std::printf("[HLE] FUN_0887801C subsystem registry\n"); std::fflush(stdout); }
         auto store = [&](std::uint32_t dst, std::uint32_t src) {

@@ -7,9 +7,24 @@
 #include <cstdlib>
 #include <stdexcept>
 #include <filesystem>
+#include <fstream>
+#include <vector>
 
 namespace psprecomp {
 void register_generated_functions(Runtime &runtime);
+void register_ovl_menu_target_functions(Runtime &runtime);
+}
+
+static void load_menu_overlay(psprecomp::Runtime &rt, const std::filesystem::path &path) {
+    std::ifstream in(path, std::ios::binary);
+    if (!in) return;
+    std::vector<std::uint8_t> b((std::istreambuf_iterator<char>(in)), {});
+    if (b.size() < 0x54) return;
+    auto u32 = [&](std::size_t p) { return static_cast<std::uint32_t>(b[p]) | (static_cast<std::uint32_t>(b[p+1])<<8) | (static_cast<std::uint32_t>(b[p+2])<<16) | (static_cast<std::uint32_t>(b[p+3])<<24); };
+    const auto off=u32(0x38), va=u32(0x3c), size=u32(0x44);
+    if (off > b.size() || size > b.size()-off || !rt.memory().contains(va,size)) return;
+    for (std::uint32_t i=0; i<size; i+=4) rt.memory().store32(va+i,u32(off+i));
+    std::printf("[OVERLAY] menu mapped at 0x%08X size=0x%X\n",va,size);
 }
 
 int main(int argc, char *argv[]) {
@@ -24,6 +39,8 @@ int main(int argc, char *argv[]) {
         std::printf("ELF loaded, type=%d\n", (int)elf.type());
         elf.load_and_relocate(runtime.memory());
         std::printf("ELF mapped to guest memory\n");
+        load_menu_overlay(runtime, std::filesystem::path(eboot).parent_path() / "OVL_MENU_APP.ELF");
+
 
         // Set game root to directory containing the BIN so file I/O can find assets
         {
@@ -43,6 +60,7 @@ int main(int argc, char *argv[]) {
         std::printf("Starting AOT registration...\n");
         fflush(stdout);
         psprecomp::register_generated_functions(runtime);
+        psprecomp::register_ovl_menu_target_functions(runtime);
         std::printf("AOT functions registered\n");
         d012::register_hle(runtime);
         std::printf("HLE registered\n");

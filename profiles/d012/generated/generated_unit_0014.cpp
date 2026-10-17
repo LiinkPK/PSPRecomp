@@ -21,10 +21,10 @@ bool          g_ge_list_executed = false;
 // The render-chain node is not yet a bounded PSP display list. Replaying it
 // as a synthetic 65536-word list causes an unbounded host-side GE loop.
 // Keep the switch explicit so the path can be re-enabled independently.
-constexpr bool kBackupExecuteRenderChain = false;
+constexpr bool kBackupExecuteRenderChain = true;
 constexpr bool kBackupRejectUnboundedGeLists = true;
 constexpr bool kBackupExecuteSyntheticPendingList = false;
-constexpr bool kBackupExecuteSlotLists = false;
+constexpr bool kBackupExecuteSlotLists = true;
 std::uint32_t g_ge_stall_updates = 0u;
 void recomp_unit_0014_entry(Runtime &rt, AllegrexContext &ctx, std::uint16_t direct_entry_id, GuestMemory::AotFastView &aot_mem) {
     (void)direct_entry_id;
@@ -4413,11 +4413,11 @@ L_089C5AC8: // sceDisplayWaitVblankStartCB() — execute pending DL, present, wa
       // restore the runtime-corrupted vtable at 0x089CAC90 and call FUN_088A2664(0.0f, 0x2713).
       // The vtable at 0x089CAC90 gets overwritten by pool/BSS data at runtime; we restore it
       // from the ELF (verified at file offset 0x1C7C68) before dispatching.
-      { constexpr bool kBackupSceneActivation = true;
+      { constexpr bool kBackupSceneActivation = false;
         // Keep disabled until the scene manager's render callback chain is
         // reconstructed; enabling it promotes an incomplete node and causes
         // unbounded malformed GE lists.
-        constexpr bool kBackupScenePromotion = true;
+        constexpr bool kBackupScenePromotion = false;
         static bool s_scene_done=false;
         if (kBackupSceneActivation && !s_scene_done) {
             const std::uint32_t pending = aot_mem.aot_load32(0x09B4CF98u);

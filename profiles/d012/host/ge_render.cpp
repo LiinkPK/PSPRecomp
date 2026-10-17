@@ -416,6 +416,7 @@ void ge_exec(const std::uint32_t *dl, const std::uint32_t *dl_end,
     static std::uint32_t s_exec_count = 0;
     ++s_exec_count;
     std::printf("[GE] exec #%u dl=%p dl_end=%p span=%zu\n", s_exec_count, (void*)dl, (void*)dl_end, (std::size_t)(dl_end - dl));
+    std::fflush(stdout);
 
     // Dump raw DL for diagnosis (first 12 execs)
     { static std::uint32_t s_dc = 0; ++s_dc;

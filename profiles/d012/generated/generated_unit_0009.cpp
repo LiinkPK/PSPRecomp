@@ -24520,6 +24520,13 @@ L_089333D8:
 L_089333E0:
     ctx.gpr[4] = (2206u << 16u);
     ctx.gpr[16] = (aot_mem.aot_load32(ctx.gpr[4] + static_cast<std::uint32_t>(-31300)));
+    { static unsigned s_sched_log = 0u;
+      if (s_sched_log++ < 8u) {
+          std::printf("[SCHED-DISPATCH] load=0x%08X value=0x%08X ra=0x%08X sp=0x%08X\\n",
+                      ctx.gpr[4] - 31300u, ctx.gpr[16], ctx.gpr[31], ctx.gpr[29]);
+          std::fflush(stdout);
+      }
+    }
     ctx.gpr[31] = (0x089333F0u);
     ctx.gpr[4] = (ctx.gpr[16] | 0u);
     goto L_0893354C;
@@ -25386,7 +25393,7 @@ L_08933A24:
 L_08933A2C:
     ctx.gpr[16] = (2206u << 16u);
     ctx.gpr[4] = (aot_mem.aot_load32(ctx.gpr[16] + static_cast<std::uint32_t>(2496)));
-    { static bool s_once=false; if(!s_once){s_once=true; std::printf("[08933A2C] fn_ptr=0x%08X gpr18=0x%08X\n",ctx.gpr[4],ctx.gpr[18]); fflush(stdout);} }
+    { static bool s_once=false; if(!s_once){s_once=true; std::printf("[08933A2C] fn_ptr=0x%08X gpr18=0x%08X words=%08X,%08X,%08X,%08X\n",ctx.gpr[4],ctx.gpr[18], aot_mem.aot_load32(ctx.gpr[4]), aot_mem.aot_load32(ctx.gpr[4]+4u), aot_mem.aot_load32(ctx.gpr[4]+8u), aot_mem.aot_load32(ctx.gpr[4]+12u)); fflush(stdout);} }
     ctx.gpr[31] = (0x08933A3Cu);
     ctx.gpr[5] = (0u | 1u);
     if (ctx.gpr[4] != 0u) {

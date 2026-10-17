@@ -1029,6 +1029,7 @@ L_0887825C:
     if (rt.invoke_chained_call(ctx, &aot_mem) && ctx.pc == 0x08878264u) goto L_08878264;
     return;
 L_08878264:
+    { static std::uint32_t s_trace=0; if (++s_trace <= 8u) { std::printf("[SCHED-CB-WRITE] 08878264 gpr16=0x%08X gpr17=0x%08X gpr18=0x%08X cbslot=0x%08X\n", ctx.gpr[16], ctx.gpr[17], ctx.gpr[18], rt.memory().aot_load32(0x089E09C0u)); fflush(stdout); } }
     ctx.set_gpr(4, 2206u << 16u);
     goto L_08878268;
 L_08878268:

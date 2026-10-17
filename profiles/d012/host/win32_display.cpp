@@ -1,7 +1,9 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <cstdio>
 #include <cstring>
 #include <cstdint>
+#include <fstream>
 #include <vector>
 #include "win32_display.hpp"
 
@@ -109,6 +111,31 @@ void display_present(const void *vram_ptr, int buf_width, int fmt) {
     } else {
         // Unknown format: fill magenta for debugging
         std::fill(s_rgba.begin(), s_rgba.end(), 0xFF00FFFFu);
+    }
+
+    // Diagnostic capture of the framebuffer produced by the guest GE path.
+    // This writes the already-converted display buffer; it does not alter it.
+    static unsigned dump_count = 0;
+    if (dump_count++ < 5u) {
+        BITMAPFILEHEADER bfh = {};
+        BITMAPINFOHEADER bih = {};
+        bih.biSize = sizeof(BITMAPINFOHEADER);
+        bih.biWidth = cols;
+        bih.biHeight = -rows;
+        bih.biPlanes = 1;
+        bih.biBitCount = 32;
+        bih.biCompression = BI_RGB;
+        bfh.bfType = 0x4D42;
+        bfh.bfOffBits = sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER);
+        bfh.bfSize = bfh.bfOffBits + static_cast<DWORD>(s_rgba.size() * sizeof(std::uint32_t));
+        char dump_path[256] = {};
+        std::snprintf(dump_path, sizeof(dump_path),
+                      "C:\\Users\\javi_\\AppData\\Local\\Temp\\psprecomp-guest-frame-%u.bmp",
+                      dump_count);
+        std::ofstream dump(dump_path, std::ios::binary);
+        dump.write(reinterpret_cast<const char *>(&bfh), sizeof(bfh));
+        dump.write(reinterpret_cast<const char *>(&bih), sizeof(bih));
+        dump.write(reinterpret_cast<const char *>(s_rgba.data()), static_cast<std::streamsize>(s_rgba.size() * sizeof(std::uint32_t)));
     }
 
     BITMAPINFO bmi = {};

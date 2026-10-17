@@ -16951,6 +16951,7 @@ L_088EA7F0:
     ctx.gpr[6] = (ctx.gpr[20] | 0u);
     if (rt.invoke_chained_direct<&recomp_unit_0002_entry, 2u, 4064u, 0x0885CA3Cu>(ctx, &aot_mem) && ctx.pc == 0x088EA800u) goto L_088EA800;
 L_088EA800:
+    { static std::uint32_t s_trace=0; if (++s_trace <= 8u) { std::printf("[SCENE-WORKER-ENTRY] 088EA800 a0=0x%08X a1=0x%08X a2=0x%08X\n", ctx.gpr[4], ctx.gpr[5], ctx.gpr[6]); fflush(stdout); } }
     ctx.gpr[21] = (ctx.gpr[2] | 0u);
     { const bool branch_taken = ctx.gpr[21] == 0u;
     // nop
