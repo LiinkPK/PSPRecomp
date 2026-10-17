@@ -13659,6 +13659,17 @@ L_08869AAC:
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
 L_08869AB4:
+    // The recovered startup path can pass a kernel/UID value here instead of
+    // a PSP pointer. Preserve the guest's null-result behavior rather than
+    // dereferencing below PSP RAM and aborting the native process.
+    if (ctx.gpr[4] < 0x08000000u) {
+        ctx.gpr[2] = 0u;
+        jump_target = ctx.gpr[31];
+        ctx.pc = jump_target;
+        local_pc = jump_target;
+        if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+        return;
+    }
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-32));
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(0), ctx.gpr[16]);
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(4), ctx.gpr[17]);
@@ -13669,6 +13680,18 @@ L_08869AB4:
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(16), ctx.gpr[20]);
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(20), ctx.gpr[31]);
     ctx.gpr[4] = (aot_mem.aot_load32(ctx.gpr[17] + static_cast<std::uint32_t>(0)));
+    if (ctx.gpr[4] < 0x08000000u) {
+        std::printf("[08869AB4] invalid object field=0x%08X\n", ctx.gpr[4]);
+        std::fflush(stdout);
+    }
+    if (ctx.gpr[4] < 0x08000000u) {
+        ctx.gpr[2] = 0u;
+        jump_target = ctx.gpr[31];
+        ctx.pc = jump_target;
+        local_pc = jump_target;
+        if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+        return;
+    }
     ctx.gpr[19] = (0u | 0u);
     ctx.gpr[20] = (aot_mem.aot_load32(ctx.gpr[4] + static_cast<std::uint32_t>(8)));
     ctx.gpr[4] = (static_cast<std::int32_t>(ctx.gpr[19]) < static_cast<std::int32_t>(ctx.gpr[20]) ? 1u : 0u);

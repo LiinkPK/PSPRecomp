@@ -202,6 +202,14 @@ public:
             explicit DepthGuard(std::uint32_t &value) : depth(value) { ++depth; }
             ~DepthGuard() { --depth; }
         } guard(chain_depth_);
+        // This recovered target is entered through several ABI shapes in the
+        // startup path. Use the exact guest-PC dispatcher for it so its entry
+        // state is reconstructed from the dispatch table instead of relying on
+        // the direct AOT entry shortcut.
+        if constexpr (DirectTargetPc == 0x08869AB4u) {
+            ctx.pc = DirectTargetPc;
+            return invoke_chained_call(ctx, shared_aot_mem);
+        }
         if constexpr (DirectTargetPc != 0u) ctx.pc = DirectTargetPc;
         if constexpr (DirectTargetPc != 0u) {
             if (const RecompiledFunction _ov = lookup_function_override(DirectTargetPc); _ov != nullptr) {

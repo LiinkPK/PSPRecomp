@@ -33,6 +33,7 @@ set(D012_GENERATED
     "${D012_PROFILE_DIR}/generated/generated_unit_0026.cpp"
     "${D012_PROFILE_DIR}/generated/generated_unit_0042.cpp"
     "${D012_PROFILE_DIR}/generated/generated_unit_0136.cpp"
+    "${D012_PROFILE_DIR}/generated/overlay_menu/generated_unit_0000.cpp"
     "${D012_PROFILE_DIR}/generated/overlay_menu/generated_unit_0001.cpp"
     "${D012_PROFILE_DIR}/generated/overlay_menu/generated_unit_0002.cpp"
     "${D012_PROFILE_DIR}/generated/overlay_menu/generated_unit_0003.cpp"
