@@ -133,6 +133,14 @@ All PSP import stubs cluster in unit 14 (`0x089C4040`–`0x089C6040`). The gener
 
 ## Current status (as of 2026-10-15, session 8)
 
+### Session 10 completion checkpoint (2026-10-15)
+
+- Fresh `Release` build succeeds.
+- Foreground launch reaches scene activation: pending scene `0x09999794` is promoted to the active scene root and the native window presents frames.
+- The temporary host-side title-card experiment was reverted; no hard-coded title pixels remain in the presentation path.
+- Backup flags remain in place for the malformed GE lists, synthetic pending lists, slot lists, render-chain replay, and scheduler maintenance path.
+- Foreground watchdog result: the guest later enters the known unbounded scheduler/task pattern (dispatches `0x088A1AE4`/`0x088D15E0` repeatedly); the run was terminated deliberately rather than left spinning.
+
 **Rendering gate `DAT_089D69DC` is now open (dc=01) from frame 2 onward.** ✅
 **`DAT_089D69E0` (render object ptr) is now set to `0x08C13A94` by `FUN_088769CC`.** ✅
 **`FUN_08883EE8` (DL builder) runs every frame with the correct render object pointer.** ✅
@@ -188,6 +196,29 @@ All PSP import stubs cluster in unit 14 (`0x089C4040`–`0x089C6040`). The gener
 | `0x001ECF3B` unregistered (bad fn ptr) | Guard at `L_0886313C` skips call if outside RAM | `generated_unit_0002.cpp` |
 | `FUN_08872F08` VRAM read crash | Stubbed — reads `0x0A000000` (VRAM mirror), unsupported | `generated_unit_0003.cpp` |
 
+### Session 9 findings (2026-10-15)
+
+#### Init sequence now fully complete
+- All INIT cross-unit call failures resolved. Two new HLE stubs added: `0x08890780` (clears `09B491F8[0,4,12]`, pushes `089D6AB0` to list) and `0x088A4168` (pushes `089D6D3C` to list).
+- INIT completes; task scheduler runs 8 tasks per frame: `0x08865E98`, `0x08865ED0`, `0x08872F08`, `0x08875364`, `0x08874DFC`, `0x088D1598`, `0x08873E6C`, `0x088751B8`.
+
+#### GE JUMP cycle detection
+- Node `0x08C15FD0` JUMP pointed back to itself (JUMP at word[8], target = word[0]). Old self-jump guard `new_p == p` failed.
+- Fixed: 16-entry history array in `ge_render.cpp`. If a JUMP target was seen before in the same exec call, abort.
+
+#### Scene creation (Square Enix logo — type 0x2713)
+- `DAT_089D603A` = 1 was blocking scene creation. When 603A≠0, `FUN_08875364` (state=0) increments state rather than calling `FUN_088A24D4(0, 0x2713, 1, 0)`.
+- ARCH-SYNTH in `generated_unit_0003.cpp`: forces `603A=0` when `6039=1` and state=0.
+- Result: `FUN_088A24D4(0, 0x2713, 1, 0)` called. Scene object created at `0x08C10DA0`. Pool count 64→63. Scene added to pending list `DAT_09B4CF98`.
+
+#### Current blocker: scene not activating
+- Scene `0x08C10DA0` (type `0x2713`, vtable `0x089CAC90`) is in **pending list** `DAT_09B4CF98`.
+- Activation requires: `FUN_0888B21C` → `FUN_08895FE4` → `FUN_088A2664` (iterates pending list) → `FUN_088A1E44` (activates scene, moves to `DAT_09B48358`).
+- None of the 8 running tasks call this chain. The render chain stays at gray node `0x08C15FD0` every frame.
+- **Next step**: identify which task/caller invokes `FUN_0888B21C`, ensure it runs, OR add ARCH-SYNTH to directly call `FUN_088A2664` once per frame.
+
+---
+
 ### Session 8 findings
 
 #### Render pipeline trace
@@ -217,6 +248,12 @@ All PSP import stubs cluster in unit 14 (`0x089C4040`–`0x089C6040`). The gener
 
 After init, the task scheduler fires. Several tasks return to `ra=0x8888505B` (corrupt — float data misread as return address). One task tries to jump to `0x08C13B40` (heap-allocated, not a recompiled function — may be a dynamically-created callback).
 
+### Watchdog finding (2026-10-15)
+
+- Foreground runs are limited to 30 seconds; stalled runs are terminated.
+- Current loop signature: repeated `ge_exec` calls on three host display-list buffers with spans of `65536`, interleaved with a growing partial-list span; approximately 5,000 executions occur within 30 seconds.
+- `kBackupScenePromotion` is disabled because promoting the incomplete scene object causes this malformed-list loop. The `$a0=0` activation correction remains enabled.
+
 ### Known archive paths in ELF binary (baked in at compile time)
 ```
 general_archive/main/main.bin          ← loaded ✅
@@ -228,3 +265,20 @@ general_archive/field/JP/menu_lang.bin ← not yet loaded
 general_archive/field/field.bin        ← not yet loaded
 general_archive/field/ZQ/field_lang.bin ← not yet loaded
 ```
+
+### Session 7 wrap-up (2026-10-15)
+
+- No completion: the authentic Square Enix logo was not verified in the native window.
+- Preserved the real 397,392-byte MPK as `original/general_archive/main/JP/main_lang.real.mpk` and tested it through the guest archive path.
+- Corrected MPK-relative pointer experiments to use the loaded guest buffer at `0x097C4A80`; execution advanced through real archive data but still faults in the generated language-object routine around `0x088DCC24`/`0x088DD21C`.
+- The visible foreground window was verified for the empty-stub path; the real-MPK path still exits before authentic logo GE submission.
+- Remaining blocker: reconstruct the MPK object layout and generated cross-unit register/return behavior without synthetic entries or host-side logo injection.
+
+### Session 10 — native rebuild and real startup trace (2026-10-17)
+
+- Rebuilt `d012_native.exe` after clearing only stale/corrupt Release `.obj` artifacts. The executable is restored at `out/d012/profiles/d012/Release/d012_native.exe`.
+- Visible bounded run confirmed the native program reads the real `main.bin` and `JP/main_lang.bin`, parses the 21-entry MPK, submits real GE lists, and presents the VRAM framebuffer.
+- Authentic logo is **not yet verified**. Execution still faults while processing the third real loading-package record:
+  `0x922A01B0` at guest PC `0x088DDDC0`.
+- This is now narrowed to the generated language/loading-record path after two valid records, not a missing executable, fake logo, or host overlay.
+- No source files or game data were removed; only rebuild artifacts under the native Release object directory were regenerated.

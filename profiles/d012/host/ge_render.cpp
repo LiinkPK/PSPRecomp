@@ -192,8 +192,9 @@ static const std::uint8_t *resolve_tex_ptr(std::uint32_t phys, std::size_t nbyte
                                              const void *mem, std::size_t mem_size,
                                              const void *vram, std::size_t vram_size) {
     static constexpr std::uint32_t kPhysBase = 0x08000000u;
-    if (phys >= 0x04000000u && phys < 0x04200000u) {
-        const std::uint32_t off = phys - 0x04000000u;
+    if (phys >= 0x04000000u && phys < 0x08000000u) {
+        // VRAM aliases 0x04000000-0x07FFFFFF → & 0x1FFFFF into 2MB VRAM
+        const std::uint32_t off = phys & 0x1FFFFFu;
         if (off + nbytes <= vram_size) return static_cast<const std::uint8_t*>(vram) + off;
     } else if (phys >= kPhysBase) {
         const std::uint32_t off = phys - kPhysBase;
@@ -416,10 +417,10 @@ void ge_exec(const std::uint32_t *dl, const std::uint32_t *dl_end,
     ++s_exec_count;
     std::printf("[GE] exec #%u dl=%p dl_end=%p span=%zu\n", s_exec_count, (void*)dl, (void*)dl_end, (std::size_t)(dl_end - dl));
 
-    // Dump raw DL for diagnosis (first 3 execs)
+    // Dump raw DL for diagnosis (first 12 execs)
     { static std::uint32_t s_dc = 0; ++s_dc;
-      if (s_dc <= 3) {
-        std::size_t lim = (std::size_t)(dl_end - dl); if (lim > 200) lim = 200;
+      if (s_dc <= 12) {
+        std::size_t lim = (std::size_t)(dl_end - dl); if (lim > 128) lim = 128;
         std::printf("[GE-RAW#%u] span=%zu words:\n", s_dc, lim);
         for (std::size_t i = 0; i < lim; ++i) {
             if (i % 8 == 0) std::printf("  %04zx:", i*4);
@@ -431,6 +432,8 @@ void ge_exec(const std::uint32_t *dl, const std::uint32_t *dl_end,
     }
     // Parse commands. dl_end is the hard limit for the initial segment.
     // After a JUMP we follow the chain freely but still respect memory bounds.
+    std::uint32_t jump_history[16] = {};
+    int jump_history_cnt = 0;
     const std::uint32_t *p = dl;
     bool jumped = false; // set true after first JUMP
     for (std::uint32_t insn_limit = 0; insn_limit < 1000000u; ++insn_limit, ++p) {
@@ -450,109 +453,149 @@ void ge_exec(const std::uint32_t *dl, const std::uint32_t *dl_end,
         const std::uint32_t arg = cmd & 0x00FFFFFFu;
 
         switch (op) {
-        case 0x00: break; // NOP
-        case 0x08: // BASE — upper address bits
-            gs.base_addr = (arg & 0xFF0000u) << 8;
-            std::printf("[GE-BASE] arg=0x%06X -> base_addr=0x%08X\n", arg, gs.base_addr); fflush(stdout);
-            break;
-        case 0x01: // VADDR — strip PSP address mode bits to get physical address
-            gs.vaddr = (gs.base_addr | arg) & 0x1FFFFFFFu;
-            std::printf("[GE-VADDR] base=0x%08X arg=0x%06X -> vaddr=0x%08X\n", gs.base_addr, arg, gs.vaddr); fflush(stdout);
-            break;
-        case 0x02: // IADDR
-            gs.iaddr = gs.base_addr | arg;
-            break;
-        case 0x0F: // FINISH — end of list
-            goto done;
-        case 0x5C: // JUMP — unconditional jump to address
-        case 0x5D: { // JUMP_END — also unconditional for our purposes
+        case 0x00: case 0xFF: break; // NOP
+
+        // Control flow
+        case 0x08: { // JUMP — unconditional jump to address (BASE | arg, lower 2 bits = 0)
             const std::uint32_t target_phys = ((gs.base_addr & 0xFF000000u) | arg) & 0x1FFFFFFFu;
             const std::uint32_t *new_p = nullptr;
-            static constexpr std::uint32_t kPhysBaseJ = 0x08000000u;
-            if (target_phys >= kPhysBaseJ && (target_phys - kPhysBaseJ) < mem_size)
-                new_p = reinterpret_cast<const std::uint32_t *>(static_cast<const char *>(mem) + (target_phys - kPhysBaseJ));
-            else if (target_phys >= 0x04000000u && target_phys < 0x04200000u)
-                new_p = reinterpret_cast<const std::uint32_t *>(static_cast<const char *>(vram) + (target_phys - 0x04000000u));
-            if (new_p) { p = new_p - 1; jumped = true; } // -1 because loop does ++p
+            if (target_phys >= 0x08000000u && (target_phys - 0x08000000u) < mem_size)
+                new_p = reinterpret_cast<const std::uint32_t *>(static_cast<const char *>(mem) + (target_phys - 0x08000000u));
+            else if (target_phys >= 0x04000000u && target_phys < 0x06000000u) {
+                const std::uint32_t voff = target_phys & 0x1FFFFFu;
+                if (voff < vram_size)
+                    new_p = reinterpret_cast<const std::uint32_t *>(static_cast<const char *>(vram) + voff);
+            }
+            { static std::uint32_t s_jmp = 0;
+              if (++s_jmp <= 8) {
+                  std::printf("[GE-JUMP] target=0x%08X %s\n", target_phys, new_p?"OK":"MISS");
+                  fflush(stdout);
+              } }
+            // Guard: detect jump cycles (render chain node pointing to itself)
+            if (new_p && new_p == p + 1) { goto done; }
+            if (new_p && new_p == p)     { goto done; }
+            if (new_p) {
+                // Detect cycles: stop if we've jumped to this target before
+                bool cycle = false;
+                for (int i = 0; i < jump_history_cnt; ++i)
+                    if (jump_history[i] == target_phys) { cycle = true; break; }
+                if (cycle) { goto done; }
+                if (jump_history_cnt < 16) jump_history[jump_history_cnt++] = target_phys;
+                p = new_p - 1; jumped = true;
+            }
             break;
         }
-        case 0x10: // SIGNAL — ignore
-        case 0x11: break;
-        case 0x09: // SCISSOR1 (x1 | y1<<10)
+        case 0x09: break; // BJUMP — conditional branch (ignore, treat as not-taken)
+        case 0x0A: break; // CALL — subroutine call (stub: ignore for now)
+        case 0x0B: break; // RET — return from subroutine (stub: ignore)
+        case 0x0C: break; // END — marks end but FINISH(0x0F) does the actual stop
+        case 0x0E: break; // SIGNAL — ignore
+        case 0x0F:        // FINISH — end of list
+            goto done;
+
+        // Address/BASE
+        case 0x10: // BASE — upper 8 bits of address
+            gs.base_addr = (arg & 0xFF0000u) << 8;
+            break;
+        case 0x13: // OFFSETADDR
+            gs.base_addr = (arg & 0xFF0000u) << 8;
+            break;
+
+        // Vertex/Index addresses
+        case 0x01: // VADDR
+            gs.vaddr = (gs.base_addr | arg) & 0x1FFFFFFFu;
+            break;
+        case 0x02: // IADDR
+            gs.iaddr = (gs.base_addr | arg) & 0x1FFFFFFFu;
+            break;
+
+        // Vertex type
+        case 0x12: // VERTEXTYPE
+            gs.vtype = arg;
+            break;
+
+        // Scissor
+        case 0xD4: // SCISSOR1 (x0 | y0<<10)
             gs.sc_x1 = arg & 0x3FFu;
             gs.sc_y1 = (arg >> 10) & 0x3FFu;
             break;
-        case 0x0A: // SCISSOR2
+        case 0xD5: // SCISSOR2 (x1 | y1<<10)
             gs.sc_x2 = (arg & 0x3FFu) + 1;
             gs.sc_y2 = ((arg >> 10) & 0x3FFu) + 1;
             break;
-        case 0xD2: { // CLEAR flags
-            // bits: 0=clear-mode-enable, 1=clear-color, 2=clear-stencil/alpha, 4=clear-depth
-            gs.clear_mode = (arg & 1) != 0;
-            break;
-        }
-        case 0x03: // BEZIER — ignore
-        case 0x05: // SPLINE — ignore
-            break;
 
-        // Framebuffer base/width/format
-        case 0x9C: // TBW — texture buffer width (bits 0..7 = width in 8-pixel units) AND format
-            // Actually: arg bits 15:0 = TPSM (pixel format), bits 23:16 = TBW (buf width / 8)
-            // From PSP docs: TBUF = 0x9D (buf width in 8s), TPSM separate
-            // Here we treat 0x9C as combined per many docs
-            gs.tbw[0] = ((arg >> 8) & 0xFFu) * 8u; // buf width in pixels
-            gs.tfmt   = (arg >> 24) & 0xFu; // pixel format in high byte — but arg is only 24 bits...
-            // Actually TPSM is a separate command (0xC8). Use arg[23:16] as TBW:
-            gs.tbw[0] = ((arg >> 16) & 0xFFu) * 8u;
+        // Framebuffer / draw target
+        case 0x9C: // FRAMEBUFPTR — low 24 bits of framebuffer base in VRAM
+            gs.fbp = arg & 0x00FFFFFFu;
             break;
-        case 0x9D: // TBUF (frame buffer base for texture) — low 24 bits
-            gs.tbp[0] = gs.base_addr | arg;
+        case 0x9D: // FRAMEBUFWIDTH — stride in pixels = arg & 0x7FC; high bits ignored
+            gs.fbw   = arg & 0x7FCu;
             break;
-        case 0x9E: case 0x9F: break; // BONE data — skip
-        case 0xA0: // VTYPE
-            gs.vtype = arg;
-            break;
-        case 0xA1: // OFFSET_ADDR
-            gs.base_addr = (arg & 0xFF0000u) << 8;
-            break;
+        case 0x9E: break; // ZBUFPTR — depth buffer, ignore
+        case 0x9F: break; // ZBUFWIDTH — depth buffer, ignore
 
-        // Texture enable
-        case 0xD4: gs.tex_enabled = (arg & 1) != 0; break;
+        // Texture addresses (TEXADDR0-7 = 0xA0-0xA7, TEXBUFWIDTH0-7 = 0xA8-0xAF)
+        case 0xA0: gs.tbp[0] = (gs.base_addr & 0xFF000000u) | arg; break;
+        case 0xA1: gs.tbp[1] = (gs.base_addr & 0xFF000000u) | arg; break;
+        case 0xA2: gs.tbp[2] = (gs.base_addr & 0xFF000000u) | arg; break;
+        case 0xA3: gs.tbp[3] = (gs.base_addr & 0xFF000000u) | arg; break;
+        case 0xA4: gs.tbp[4] = (gs.base_addr & 0xFF000000u) | arg; break;
+        case 0xA5: gs.tbp[5] = (gs.base_addr & 0xFF000000u) | arg; break;
+        case 0xA6: gs.tbp[6] = (gs.base_addr & 0xFF000000u) | arg; break;
+        case 0xA7: gs.tbp[7] = (gs.base_addr & 0xFF000000u) | arg; break;
+        case 0xA8: gs.tbw[0] = arg & 0xFFFFu; break;
+        case 0xA9: gs.tbw[1] = arg & 0xFFFFu; break;
+        case 0xAA: gs.tbw[2] = arg & 0xFFFFu; break;
+        case 0xAB: gs.tbw[3] = arg & 0xFFFFu; break;
+        case 0xAC: gs.tbw[4] = arg & 0xFFFFu; break;
+        case 0xAD: gs.tbw[5] = arg & 0xFFFFu; break;
+        case 0xAE: gs.tbw[6] = arg & 0xFFFFu; break;
+        case 0xAF: gs.tbw[7] = arg & 0xFFFFu; break;
 
-        // Texture base pointers (TBP0-7 at 0xA2-0xA9 per SDK)
-        case 0xA2: gs.tbp[0] = (gs.base_addr & 0xFF000000u) | arg; break;
-        case 0xA3: gs.tbp[1] = (gs.base_addr & 0xFF000000u) | arg; break;
-        case 0xA4: gs.tbp[2] = (gs.base_addr & 0xFF000000u) | arg; break;
-        case 0xA5: gs.tbp[3] = (gs.base_addr & 0xFF000000u) | arg; break;
-        case 0xA6: gs.tbw[0] = arg & 0xFFFFu; break;
-        case 0xA7: gs.tbw[1] = arg & 0xFFFFu; break;
-        case 0xA8: { // TSIZE — texture dimensions as log2
+        // Texture size (TEXSIZE0-7 = 0xB8-0xBF)
+        case 0xB8: { // TEXSIZE0 — width and height as log2
             int tw_log = arg & 0xFu;
             int th_log = (arg >> 8) & 0xFu;
             gs.tw = 1u << tw_log;
             gs.th = 1u << th_log;
             break;
         }
-        case 0xAD: gs.tfmt = arg & 0xFu; break; // TPSM — texture pixel format
+        case 0xB9: case 0xBA: case 0xBB: case 0xBC: case 0xBD: case 0xBE: case 0xBF: break; // TEXSIZE1-7
 
-        // Frame buffer target
-        case 0x9A: gs.fbp  = arg & 0x00FFFFFFu; break; // FBUF base (VRAM-relative)
-        case 0x9B: gs.fbw  = arg & 0xFFFFu; gs.fbfmt = (arg >> 16) & 0xFu; break; // FBUFWIDTH+FMT
+        // Texture format / filter / etc.
+        case 0xC3: gs.tfmt = arg & 0xFu; break; // TEXFORMAT (TPSM)
+        case 0x1E: gs.tex_enabled = (arg & 1) != 0; break; // TEXTUREMAPENABLE
+
+        // Framebuffer pixel format
+        case 0xD2: // FRAMEBUFPIXFORMAT
+            gs.fbfmt = arg & 0xFu;
+            break;
+
+        // Clear mode
+        case 0xD3: { // CLEARMODE
+            gs.clear_mode = (arg & 1) != 0;
+            break;
+        }
 
         default: break;
         }
 
-        // COLOR register for clear / ambient
-        if (op == 0xD3) {
-            gs.color = arg | 0xFF000000u;
-            gs.clear_color = arg | 0xFF000000u;
+        // COLOR register for clear / ambient (AMBIENTCOLOR=0x5C, AMBIENTALPHA=0x5D, CLEARCOLOR via 0xD3 path)
+        if (op == 0x5C) {
+            gs.color = (gs.color & 0xFF000000u) | (arg & 0x00FFFFFFu);
+            gs.clear_color = gs.color;
+        }
+        if (op == 0x5D) {
+            gs.color = (gs.color & 0x00FFFFFFu) | ((arg & 0xFFu) << 24);
+            gs.clear_color = gs.color;
         }
 
         // Draw primitive: PSP GE PRIM opcode is 0x04
         if (op == 0x04) { // PRIM (prim_type<<16 | vertex_count)
             static std::uint32_t s_prim_log = 0;
-            if (++s_prim_log <= 10) std::printf("[GE-PRIM] type=%u count=%u vtype=0x%X vaddr=0x%08X fbp=0x%X fbfmt=%d\n",
-                (arg>>16)&7, arg&0xFFFF, gs.vtype, gs.vaddr, gs.fbp, gs.fbfmt);
+            if (++s_prim_log <= 20) std::printf("[GE-PRIM] type=%u count=%u vtype=0x%X vaddr=0x%08X fbp=0x%X fbfmt=%d sc=(%d,%d)-(%d,%d) clr=%d cc=0x%08X\n",
+                (arg>>16)&7, arg&0xFFFF, gs.vtype, gs.vaddr, gs.fbp, gs.fbfmt,
+                gs.sc_x1, gs.sc_y1, gs.sc_x2, gs.sc_y2, gs.clear_mode, gs.clear_color);
             const std::uint32_t prim_type = (arg >> 16) & 7;
             const std::uint32_t count     = arg & 0xFFFFu;
             if (count == 0) break;
@@ -562,8 +605,11 @@ void ge_exec(const std::uint32_t *dl, const std::uint32_t *dl_end,
             // mem pointer covers physical 0x00000000+ (PSP RAM), vram covers 0x04000000+.
             const std::uint32_t va = gs.vaddr;
             const std::uint8_t *vptr = nullptr;
-            if (va >= 0x04000000u && va < 0x04200000u && (va - 0x04000000u) < vram_size) {
-                vptr = static_cast<const std::uint8_t*>(vram) + (va - 0x04000000u);
+            if (va >= 0x04000000u && va < 0x08000000u) {
+                // VRAM aliases: 0x04000000-0x07FFFFFF all map into 2MB VRAM via & 0x1FFFFF
+                const std::uint32_t voff = va & 0x1FFFFFu;
+                if (voff < vram_size)
+                    vptr = static_cast<const std::uint8_t*>(vram) + voff;
             } else if (va < 0x04000000u) {
                 // GE bus physical RAM range 0x00000000 - 0x03FFFFFF
                 if (va < mem_size)
@@ -651,17 +697,30 @@ void ge_exec(const std::uint32_t *dl, const std::uint32_t *dl_end,
             // When in clear mode, the PRIM just fills the scissor rect with the clear color
             if (gs.clear_mode) {
                 const std::uint32_t cc = gs.clear_color;
-                const int bpp = (gs.fbfmt == 0) ? 2 : 4;
+                // bpp: formats 0(RGB565),1(RGBA5551),2(RGBA4444) = 2 bytes; 3(RGBA8888) = 4 bytes
+                const int bpp = (gs.fbfmt == 3) ? 4 : 2;
+                const std::uint32_t stride = (gs.fbw > 0) ? gs.fbw : 512u;
+                { static std::uint32_t s_clr = 0;
+                  if (++s_clr <= 5) std::printf("[GE-CLEAR] fbp=0x%X fbw=%u fbfmt=%d sc=(%d,%d)-(%d,%d) cc=0x%08X bpp=%d\n",
+                      gs.fbp,gs.fbw,gs.fbfmt,gs.sc_x1,gs.sc_y1,gs.sc_x2,gs.sc_y2,cc,bpp); fflush(stdout); }
                 for (int y = gs.sc_y1; y < gs.sc_y2 && y < 272; ++y) {
                     std::uint8_t *row = static_cast<std::uint8_t*>(vram)
-                                      + gs.fbp + static_cast<std::size_t>(y) * gs.fbw * bpp;
+                                      + gs.fbp + static_cast<std::size_t>(y) * stride * bpp;
+                    if (row < static_cast<std::uint8_t*>(vram)) continue;
                     if (row + gs.sc_x2 * bpp > static_cast<std::uint8_t*>(vram) + vram_size) continue;
-                    if (gs.fbfmt == 0) {
+                    if (bpp == 2) {
                         auto *dst = reinterpret_cast<std::uint16_t*>(row);
-                        const std::uint8_t r = (cc >>  0) & 0xFF;
-                        const std::uint8_t g = (cc >>  8) & 0xFF;
-                        const std::uint8_t b = (cc >> 16) & 0xFF;
-                        const std::uint16_t px16 = static_cast<std::uint16_t>(((r>>3)<<11)|((g>>2)<<5)|(b>>3));
+                        std::uint16_t px16 = 0;
+                        if (gs.fbfmt == 0) { // RGB565
+                            const std::uint8_t r=(cc>>0)&0xFF, g=(cc>>8)&0xFF, b=(cc>>16)&0xFF;
+                            px16 = static_cast<std::uint16_t>(((r>>3)<<11)|((g>>2)<<5)|(b>>3));
+                        } else if (gs.fbfmt == 1) { // RGBA5551
+                            const std::uint8_t r=(cc>>0)&0xFF, g=(cc>>8)&0xFF, b=(cc>>16)&0xFF, a=(cc>>24)&0xFF;
+                            px16 = static_cast<std::uint16_t>(((r>>3)<<11)|((g>>3)<<6)|((b>>3)<<1)|(a>>7));
+                        } else { // RGBA4444
+                            const std::uint8_t r=(cc>>0)&0xFF, g=(cc>>8)&0xFF, b=(cc>>16)&0xFF, a=(cc>>24)&0xFF;
+                            px16 = static_cast<std::uint16_t>(((r>>4)<<12)|((g>>4)<<8)|((b>>4)<<4)|(a>>4));
+                        }
                         for (int x = gs.sc_x1; x < gs.sc_x2; ++x) dst[x] = px16;
                     } else {
                         auto *dst = reinterpret_cast<std::uint32_t*>(row);

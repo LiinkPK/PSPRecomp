@@ -36,6 +36,10 @@ std::int32_t  io_read(std::uint32_t fd, void *buf, std::uint32_t size);
 std::int32_t  io_close(std::uint32_t fd);
 std::int64_t  io_lseek(std::uint32_t fd, std::int64_t offset, std::uint32_t whence);
 
+// Display framebuffer state — set by sceDisplaySetFrameBuf, read by present code
+struct DisplayFbInfo { std::uint32_t vaddr; std::uint32_t stride; int fmt; };
+extern DisplayFbInfo g_display_fb;
+
 // Kernel HLE — used from generated_unit_0014.cpp labels
 std::uint32_t hle_create_callback(std::uint32_t func);
 void          hle_delete_callback(std::uint32_t uid);

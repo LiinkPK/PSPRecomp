@@ -72,8 +72,26 @@ void display_present(const void *vram_ptr, int buf_width, int fmt) {
                        | ( p & 0xFF000000u);            // A
             }
         }
-    } else {
-        // RGB565 (fmt == 1) — expand to BGRA8888 for GDI
+    } else if (fmt == 1) {
+        // RGBA5551 — 16-bit: R[15:11] G[10:6] B[5:1] A[0]
+        const auto *src = static_cast<const std::uint16_t *>(vram_ptr);
+        for (int y = 0; y < rows; ++y) {
+            const std::uint16_t *row = src + y * buf_width;
+            std::uint32_t       *dst = s_rgba.data() + y * cols;
+            for (int x = 0; x < cols; ++x) {
+                const std::uint16_t p = row[x];
+                const std::uint8_t r = static_cast<std::uint8_t>(((p >> 11) & 0x1F) * 255 / 31);
+                const std::uint8_t g = static_cast<std::uint8_t>(((p >>  6) & 0x1F) * 255 / 31);
+                const std::uint8_t b = static_cast<std::uint8_t>(((p >>  1) & 0x1F) * 255 / 31);
+                // BGRA for GDI
+                dst[x] = (static_cast<std::uint32_t>(r) << 16)
+                       | (static_cast<std::uint32_t>(g) <<  8)
+                       |  static_cast<std::uint32_t>(b)
+                       | 0xFF000000u;
+            }
+        }
+    } else if (fmt == 0) {
+        // RGB565 — 16-bit: R[15:11] G[10:5] B[4:0]
         const auto *src = static_cast<const std::uint16_t *>(vram_ptr);
         for (int y = 0; y < rows; ++y) {
             const std::uint16_t *row = src + y * buf_width;
@@ -88,6 +106,9 @@ void display_present(const void *vram_ptr, int buf_width, int fmt) {
                        |  static_cast<std::uint32_t>(b);
             }
         }
+    } else {
+        // Unknown format: fill magenta for debugging
+        std::fill(s_rgba.begin(), s_rgba.end(), 0xFF00FFFFu);
     }
 
     BITMAPINFO bmi = {};

@@ -24524,6 +24524,7 @@ L_089333E0:
     ctx.gpr[4] = (ctx.gpr[16] | 0u);
     goto L_0893354C;
 L_089333F0:
+    { static std::uint32_t s_f0=0; if(++s_f0<=5) { std::printf("[L089333F0#%u] gpr16=0x%08X\n",s_f0,ctx.gpr[16]); std::fflush(stdout); } }
     ctx.gpr[31] = (0x089333F8u);
     ctx.gpr[4] = (ctx.gpr[16] | 0u);
     goto L_08933458;
@@ -25497,7 +25498,12 @@ L_08933B14:
     ctx.gpr[31] = (0x08933B38u);
     // nop
     ctx.pc = jump_target;
-    { static std::uint32_t s_b14 = 0u; if (++s_b14 <= 3u) std::printf("[08933B14-CALL] target=0x%08X sp=0x%08X\n", jump_target, ctx.gpr[29]); }
+    { static std::uint32_t s_b14 = 0u; if (++s_b14 <= 5u) std::printf("[08933B14-CALL] target=0x%08X sp=0x%08X\n", jump_target, ctx.gpr[29]); }
+    // If target is 0x0887801C (unit_0015 entry), use direct invoke to bypass budget limits.
+    if (jump_target == 0x0887801Cu) {
+        if (rt.invoke_chained_direct<&recomp_unit_0015_entry, 15u, 1u, 0x0887801Cu>(ctx, &aot_mem) && ctx.pc == 0x08933B38u) goto L_08933B38;
+        return;
+    }
     if (rt.invoke_chained_call(ctx, &aot_mem) && ctx.pc == 0x08933B38u) goto L_08933B38;
     return;
 L_08933B38:
@@ -26254,7 +26260,11 @@ L_089342E8:
     if (rt.invoke_chained_direct<&recomp_unit_0014_entry, 14u, 304u, 0x089C5F18u>(ctx, &aot_mem) && ctx.pc == 0x08934300u) goto L_08934300;
     return;
 L_08934300:
-    rt.unsupported(0x08934300u, 0x0000000Du, "special? not lowered yet"); return;
+    // SYSCALL render-wait point: in PSP this was sceKernelWaitSema/sleep.
+    // In our single-threaded recomp, sceDisplaySetFrameBuf already presented
+    // the frame. Just fall through so the render loop continues normally.
+    ctx.gpr[2] = 0u;
+    goto L_0893431C;
 L_0893431C:
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-16));
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(0), ctx.gpr[16]);
@@ -28720,6 +28730,11 @@ L_0893551C:
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
 L_08935524:
+    if (ctx.gpr[4] < 0x08000000u || ctx.gpr[5] < 0x08000000u) {
+        std::printf("[MEMCPY-BAD] ra=0x%08X dst=0x%08X src=0x%08X len=0x%08X\\n",
+                    ctx.gpr[31], ctx.gpr[4], ctx.gpr[5], ctx.gpr[6]);
+        fflush(stdout);
+    }
     ctx.gpr[7] = (ctx.gpr[4] | 0u);
     ctx.gpr[2] = (ctx.gpr[4] | 0u);
     ctx.gpr[8] = (ctx.gpr[6] | 0u);

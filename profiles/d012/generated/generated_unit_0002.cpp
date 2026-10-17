@@ -44403,6 +44403,13 @@ L_0885C6BC:
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
 L_0885C6CC:
+    if (ctx.gpr[4] < 0x08000000u) {
+        { static bool s_once=false; if(!s_once){s_once=true; std::printf("[0885C6CC] null guard: a0=0x%08X ra=0x%08X\n",ctx.gpr[4],ctx.gpr[31]); fflush(stdout);} }
+        ctx.gpr[2] = 0u;
+        jump_target = ctx.gpr[31]; ctx.pc = jump_target; local_pc = jump_target;
+        if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+        return;
+    }
     ctx.gpr[8] = (ctx.gpr[8] & 255u);
     { const bool branch_taken = static_cast<std::int32_t>(ctx.gpr[6]) > 0;
     ctx.gpr[7] = (ctx.gpr[9] & 255u);

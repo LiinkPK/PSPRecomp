@@ -6017,9 +6017,16 @@ L_08804240:
     if (rt.invoke_chained_direct<&recomp_unit_0012_entry, 12u, 3016u, 0x08998578u>(ctx, &aot_mem) && ctx.pc == 0x08804248u) goto L_08804248;
     return;
 L_08804248:
+    // Save gpr[20] (scene manager ptr) on first call; L_08804254 clobbers it to 0.
+    { static std::uint32_t s_saved_gpr20 = 0u;
+      if (ctx.gpr[20] != 0u) s_saved_gpr20 = ctx.gpr[20];
+      else if (s_saved_gpr20 != 0u) ctx.gpr[20] = s_saved_gpr20; }
     ctx.gpr[4] = (ctx.gpr[20] + 0u);
     ctx.gpr[31] = (0x08804254u);
     ctx.gpr[5] = (ctx.gpr[29] + 0u);
+    // Call FUN_08933398 — it contains the internal render loop that drives
+    // sceDisplaySetFrameBuf each frame. L_08934300's frame-wait SYSCALL is now
+    // a no-op, so the loop runs naturally without breaking out.
     if (rt.invoke_chained_direct<&recomp_unit_0009_entry, 9u, 2109u, 0x08933398u>(ctx, &aot_mem) && ctx.pc == 0x08804254u) goto L_08804254;
     return;
 L_08804254:
@@ -6042,25 +6049,12 @@ L_08804264:
       goto L_08804270;
     }
 L_08804270:
-    { static std::uint32_t s_270 = 0u; if (++s_270 <= 5u) std::printf("[L08804270] iter=%u s16=0x%08X\n", s_270, ctx.gpr[16]); }
+    // Render loop is driven by FUN_08933398's internal loop — just wait here.
     ctx.gpr[31] = (0x08804278u);
     ctx.gpr[4] = (ctx.gpr[16] + 0u);
-    // Pump until scene_tick returns to 0x08804278.  Budget=2048 is not enough
-    // for a full frame so we keep re-entering via invoke_chained_call.
-    {
-        (void)rt.invoke_chained_direct<&recomp_unit_0009_entry, 9u, 2451u, 0x08934A48u>(ctx, &aot_mem);
-        if (ctx.pc == 0x08804278u) goto L_08804278;
-        static std::uint32_t s_pump = 0u;
-        for (int _retry = 0; _retry < 131072; ++_retry) {
-            (void)rt.invoke_chained_call(ctx, &aot_mem);
-            if (ctx.pc == 0x08804278u) goto L_08804278;
-            if ((_retry & 0xFFF) == 0 && ++s_pump <= 4u)
-                std::printf("[PUMP270] retry=%d pc=0x%08X\n", _retry, ctx.pc);
-        }
-        { static std::uint32_t s_give = 0u; if (++s_give <= 3u) std::printf("[PUMP270] gave up pc=0x%08X\n", ctx.pc); }
-    }
-    return;
+    goto L_08804278;
 L_08804278:
+    { extern std::uint32_t g_frame_recovery_pc; g_frame_recovery_pc = 0u; }
     { static std::uint32_t s_278 = 0u; if (++s_278 <= 5u) std::printf("[L08804278] iter=%u\n", s_278); }
     ctx.gpr[31] = (0x08804280u);
     ctx.gpr[4] = (ctx.gpr[2] + 0u);
@@ -6075,8 +6069,10 @@ L_08804278:
     return;
 L_08804280:
     { static std::uint32_t s_280 = 0u; if (++s_280 <= 3u) std::printf("[L08804280] iter=%u\n", s_280); }
-    // nop
-    goto L_08804270;
+    // In the original PSP code, the loop L_08804280→L_08804270 spins waiting for the
+    // async render thread. In our single-threaded recomp, each frame is complete by the
+    // time we reach L_08804280, so jump back to L_08804248 to set up the NEXT frame.
+    goto L_08804248;
 L_08804288:
     ctx.gpr[31] = (0x08804290u);
     ctx.gpr[4] = (0u + static_cast<std::uint32_t>(1));

@@ -18,6 +18,11 @@ namespace psprecomp {
 bool g_runtime_chain_observers_active = false;
 std::uint64_t g_runtime_starvation_interval_fast = 0u;
 std::uint64_t g_runtime_thread_switch_generation_fast = 0u;
+// Optional hook: called when a chained call or outer dispatch ends with pc=0, ra=0.
+// Returns a recovery PC; if non-zero, g_frame_reset_sp is applied to sp first.
+std::uint32_t (*g_frame_complete_hook)() = nullptr;
+// If non-zero, sp is reset to this value when frame-complete recovery fires.
+std::uint32_t g_frame_reset_sp = 0u;
 
 namespace {
 using RuntimePostImportHook = void (*)(Runtime &, AllegrexContext &);
@@ -213,8 +218,16 @@ bool Runtime::invoke_chained_call(AllegrexContext &ctx, GuestMemory::AotFastView
 
     if (ctx.pc == 0u) {
         ctx.gpr[2] = 0u;
-        ctx.pc = ctx.gpr[31] != 0u ? ctx.gpr[31] : 0x00000001u;
-        return true;
+        if (ctx.gpr[31] != 0u) {
+            ctx.pc = ctx.gpr[31];
+        } else {
+            // ra=0: thread/frame ended naturally (frame complete).
+            // Use the frame-recovery address if one is registered via the hook.
+            const std::uint32_t recovery = g_frame_complete_hook != nullptr ? g_frame_complete_hook() : 0u;
+            if (recovery != 0u && g_frame_reset_sp != 0u) ctx.gpr[29] = g_frame_reset_sp;
+            ctx.pc = recovery != 0u ? recovery : 0x00000001u;
+        }
+        return ctx.pc != 0x00000001u;
     }
 
     // Indirect jalr/vcall targets usually land in ordinary generated code too.
@@ -655,11 +668,31 @@ void Runtime::run(std::uint32_t entry, std::uint64_t max_dispatches) {
         for (; executed_dispatches < max_dispatches && !stopped_; ++executed_dispatches) {
             const std::uint32_t before = cpu_.pc;
             if (before == 0u) {
-                std::printf("[DBG] outer null-PC last=0x%08X ra=0x%08X a0=0x%08X v0=0x%08X sp=0x%08X\n", last_dispatch_pc, cpu_.gpr[31], cpu_.gpr[4], cpu_.gpr[2], cpu_.gpr[29]);
-                if (memory_.contains(cpu_.gpr[21], 4u))
-                    std::printf("[DBG] *s5=0x%08X\n", memory_.load32(cpu_.gpr[21]));
+                static std::uint32_t s_nullpc = 0u;
+                if (++s_nullpc <= 5u) {
+                    std::printf("[DBG] outer null-PC last=0x%08X ra=0x%08X a0=0x%08X v0=0x%08X sp=0x%08X\n", last_dispatch_pc, cpu_.gpr[31], cpu_.gpr[4], cpu_.gpr[2], cpu_.gpr[29]);
+                    if (memory_.contains(cpu_.gpr[21], 4u))
+                        std::printf("[DBG] *s5=0x%08X\n", memory_.load32(cpu_.gpr[21]));
+                }
                 cpu_.gpr[2] = 0u;
-                cpu_.pc = cpu_.gpr[31] != 0u ? cpu_.gpr[31] : 0x00000001u;
+                // Detect self-loop: ra points back to the function we just came from.
+                // This means an uncompiled callee returned us here and we'd spin forever.
+                // Force frame recovery to escape.
+                const bool ra_loops = (cpu_.gpr[31] != 0u && cpu_.gpr[31] == last_dispatch_pc);
+                if (cpu_.gpr[31] != 0u && !ra_loops) {
+                    cpu_.pc = cpu_.gpr[31];
+                } else {
+                    const std::uint32_t recovery = g_frame_complete_hook != nullptr ? g_frame_complete_hook() : 0u;
+                    if (recovery != 0u) {
+                        static std::uint32_t s_orec = 0u;
+                        if (++s_orec <= 3u) std::printf("[OUTER-RECOVERY] pc=0x%08X sp-reset=0x%08X loop=%d\n", recovery, g_frame_reset_sp, (int)ra_loops);
+                        if (g_frame_reset_sp != 0u) cpu_.gpr[29] = g_frame_reset_sp;
+                        cpu_.gpr[31] = 0x00000001u;
+                        cpu_.pc = recovery;
+                    } else {
+                        cpu_.pc = 0x00000001u;
+                    }
+                }
                 continue;
             }
             chain_context_invalidated_ = false;
@@ -679,6 +712,15 @@ void Runtime::run(std::uint32_t entry, std::uint64_t max_dispatches) {
                 cpu_.pc = cpu_.gpr[31];
                 if (cpu_.pc == 0u || cpu_.pc == 0x00000001u) {
                     stop("No recompiled function registered at " + hex32(before));
+                    break;
+                }
+                // If ra == the pc we just came from (self-loop), use frame recovery to escape.
+                if (cpu_.pc == before || cpu_.pc == last_dispatch_pc) {
+                    if (g_frame_complete_hook != nullptr) {
+                        const std::uint32_t recovery = g_frame_complete_hook();
+                        if (recovery != 0u) { cpu_.pc = recovery; continue; }
+                    }
+                    stop("Unregistered function loop at " + hex32(before));
                     break;
                 }
                 continue;

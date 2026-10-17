@@ -15,8 +15,17 @@
 namespace psprecomp {
 
 // GE list tracking: set at EnQueue, advanced by UpdateStall, reset at ListSync
-std::uint32_t g_ge_list_start  = 0u;
-std::uint32_t g_ge_exec_cursor = 0u;
+std::uint32_t g_ge_list_start    = 0u;
+std::uint32_t g_ge_exec_cursor   = 0u;
+bool          g_ge_list_executed = false;
+// The render-chain node is not yet a bounded PSP display list. Replaying it
+// as a synthetic 65536-word list causes an unbounded host-side GE loop.
+// Keep the switch explicit so the path can be re-enabled independently.
+constexpr bool kBackupExecuteRenderChain = false;
+constexpr bool kBackupRejectUnboundedGeLists = true;
+constexpr bool kBackupExecuteSyntheticPendingList = false;
+constexpr bool kBackupExecuteSlotLists = false;
+std::uint32_t g_ge_stall_updates = 0u;
 void recomp_unit_0014_entry(Runtime &rt, AllegrexContext &ctx, std::uint16_t direct_entry_id, GuestMemory::AotFastView &aot_mem) {
     (void)direct_entry_id;
     { static std::uint32_t s_u14 = 0u; ++s_u14;
@@ -4097,9 +4106,9 @@ L_089C5A40:
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
 L_089C5A48: // sceGeListSync(listid, syncType) -> 0
-    // List is done — reset cursor so next EnQueue starts fresh
     g_ge_list_start  = 0u;
     g_ge_exec_cursor = 0u;
+      g_ge_stall_updates = 0u;
     ctx.gpr[2] = 0u;
     jump_target = ctx.gpr[31];
     ctx.pc = jump_target;
@@ -4144,15 +4153,14 @@ L_089C5A70: // sceGeSetCallback(cb) -> 1
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
 L_089C5A78: // sceGeListEnQueue(list, stall, cbid, arg) -> list_id
-    // Record list start; actual execution happens in UpdateStall or ListSync
+    // Just record list start; execution happens at VCB/ListSync time
     { static std::uint32_t s_geq = 1u;
       const std::uint32_t list_phys  = ctx.gpr[4] & 0x1FFFFFFFu;
       const std::uint32_t stall_phys = ctx.gpr[5] & 0x1FFFFFFFu;
-      // Just record the list start; ge_exec runs at display_present time
-      extern std::uint32_t g_ge_list_start;
-      extern std::uint32_t g_ge_exec_cursor;
-      g_ge_list_start  = list_phys;
-      g_ge_exec_cursor = list_phys;
+      g_ge_list_start    = list_phys;
+      g_ge_exec_cursor   = list_phys;
+      g_ge_stall_updates = 0u;
+      g_ge_list_executed = false;
       ctx.gpr[2] = s_geq++;
     }
     jump_target = ctx.gpr[31];
@@ -4180,6 +4188,8 @@ L_089C5A90: // sceGeListUpdateStallAddr(listid, stall) -> 0
       extern std::uint32_t g_ge_list_start;
       extern std::uint32_t g_ge_exec_cursor;
       if (new_stall > g_ge_exec_cursor
+          && (!kBackupRejectUnboundedGeLists || g_ge_stall_updates < 8u)
+          && (!kBackupRejectUnboundedGeLists || new_stall - g_ge_exec_cursor <= 0x1000u)
           && g_ge_exec_cursor >= g_ge_list_start
           && rt.memory().contains(g_ge_exec_cursor, 4u)
           && rt.memory().contains(new_stall - 4u, 4u)) {
@@ -4190,6 +4200,7 @@ L_089C5A90: // sceGeListUpdateStallAddr(listid, stall) -> 0
           if (vram_ptr)
               d012::ge_exec(dl_ptr, dl_end, vram_ptr, 0x200000u, mem_vec.data(), mem_vec.size(), 0x08000000u);
           g_ge_exec_cursor = new_stall;
+          ++g_ge_stall_updates;
       }
     }
     ctx.gpr[2] = 0u;
@@ -4258,7 +4269,8 @@ L_089C5AC0: // sceDisplaySetFrameBuf(buf, bufWidth, pixelFormat, sync)
             const std::uint32_t len = dl_end_addr > dl_start ? (dl_end_addr - dl_start) / 4u : 0u;
             std::printf("[DL#%u] start=0x%08X end=0x%08X len=%u\n", s_frame, dl_start, dl_end_addr, len);
             // Dump ALL words (including bone) for first frames, skip bone for later
-            if (dl_start && dl_end_addr > dl_start) {
+            if (dl_start && dl_end_addr > dl_start &&
+                (!kBackupRejectUnboundedGeLists || dl_end_addr - dl_start <= 0x1000u)) {
                 std::uint32_t shown = 0u;
                 for (std::uint32_t _p = dl_start; _p < dl_end_addr && shown < 64u; _p += 4u) {
                     if (!rt.memory().contains(_p, 4u)) break;
@@ -4270,7 +4282,8 @@ L_089C5AC0: // sceDisplaySetFrameBuf(buf, bufWidth, pixelFormat, sync)
             }
         }
         // Execute the bone DL (slot-based)
-        if (dl_start && dl_end_addr > dl_start
+        if (kBackupExecuteSlotLists && dl_start && dl_end_addr > dl_start
+            && (!kBackupRejectUnboundedGeLists || dl_end_addr - dl_start <= 0x1000u)
             && rt.memory().contains(dl_start, 4u)
             && rt.memory().contains(dl_end_addr - 4u, 4u)) {
             const auto *dl_ptr = reinterpret_cast<const std::uint32_t *>(rt.memory().raw_pointer(dl_start, 4u));
@@ -4308,7 +4321,7 @@ L_089C5AC0: // sceDisplaySetFrameBuf(buf, bufWidth, pixelFormat, sync)
                   }
               }
               // Walk the node chain and execute each DL segment
-              if (node_ptr && rt.memory().contains(node_ptr, 4u)) {
+              if (kBackupExecuteRenderChain && node_ptr && rt.memory().contains(node_ptr, 4u)) {
                   void *vram_ptr = rt.memory().raw_pointer(0x04000000u, 0x200000u);
                   const auto &mem_vec = rt.memory().bytes();
                   const std::uint32_t *node_dl = reinterpret_cast<const std::uint32_t *>(rt.memory().raw_pointer(node_ptr, 4u));
@@ -4318,34 +4331,21 @@ L_089C5AC0: // sceDisplaySetFrameBuf(buf, bufWidth, pixelFormat, sync)
           }
         }
       }
-      if (buf_va >= 0x04000000u) {
-          const std::size_t vram_off = buf_va - 0x04000000u;
+      { // Present: scan VRAM candidates, pick the buffer with the most pixels
           const auto &vram = rt.memory().vram_bytes();
-          if (vram_off < vram.size()) {
-              // Diagnostic: count non-zero pixels — check display buffer AND back buffer (offset 0)
-              { static std::uint32_t s_frame_diag = 0;
-                if (++s_frame_diag <= 5u) {
-                    std::uint32_t nz = 0;
-                    const std::uint8_t *px = vram.data() + vram_off;
-                    const std::size_t total = std::min(vram.size() - vram_off, std::size_t(480*272*4));
-                    for (std::size_t i = 0; i < total; i += 4)
-                        if (px[i]|px[i+1]|px[i+2]|px[i+3]) ++nz;
-                    // Also check back buffer at EDRAM offset 0 (GE fbp=0 renders here)
-                    std::uint32_t nz_bb = 0;
-                    if (vram.size() >= std::size_t(480*272*4)) {
-                        const std::uint8_t *bb = vram.data();
-                        for (std::size_t i = 0; i < std::size_t(480*272*4); i += 4)
-                            if (bb[i]|bb[i+1]|bb[i+2]|bb[i+3]) ++nz_bb;
-                    }
-                    std::printf("[display] frame %u: vram_off=0x%zX non_zero_pixels=%u nz_backbuf=%u fmt=%u w=%u\n",
-                                s_frame_diag, vram_off, nz, nz_bb, fmt, buf_w);
-                }
-              }
-              d012::display_present(vram.data() + vram_off,
-                                    static_cast<int>(buf_w),
-                                    static_cast<int>(fmt));
-              d012::display_pump();
+          constexpr std::size_t kFbB = 512u * 272u * 4u;
+          static const std::size_t kCands2[] = {0x00000u,0x44000u,0x88000u,0x110000u,0x154000u};
+          const std::uint8_t *best2 = vram.data(); std::uint32_t best2_nz = 0u; std::size_t best2_off = 0u;
+          for (std::size_t off2 : kCands2) {
+              if (off2 + kFbB > vram.size()) continue;
+              std::uint32_t nz2 = 0; const std::uint8_t *p2 = vram.data()+off2;
+              for (std::size_t i=0;i<kFbB;i+=4) if(p2[i]|p2[i+1]|p2[i+2]|p2[i+3]) ++nz2;
+              if (nz2 > best2_nz) { best2_nz=nz2; best2=p2; best2_off=off2; }
           }
+          { static std::uint32_t s_fd=0; if(++s_fd<=5u)
+              std::printf("[display] frame %u: presenting VRAM+0x%zX nz=%u fmt=%u w=%u\n",s_fd,best2_off,best2_nz,fmt,buf_w); }
+          d012::display_present(best2, static_cast<int>(buf_w), static_cast<int>(fmt));
+          d012::display_pump();
       }
     }
     ctx.gpr[2] = 0u;
@@ -4355,83 +4355,197 @@ L_089C5AC0: // sceDisplaySetFrameBuf(buf, bufWidth, pixelFormat, sync)
     local_pc = jump_target;
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
-L_089C5AC8: // sceDisplayWaitVblankStartCB() — execute DL, present, then wait 16ms
+L_089C5AC8: // sceDisplayWaitVblankStartCB() — execute pending DL, present, wait 16ms
     { static std::uint32_t s_vcb_frame = 0u;
       ++s_vcb_frame;
-      // Execute the render-chain DL built by FUN_089AD370 for this frame.
+      // Execute any pending (unexecuted) DL — game fills it between EnQueue and here
+      if (kBackupExecuteSyntheticPendingList && !g_ge_list_executed && g_ge_list_start != 0u
+          && rt.memory().contains(g_ge_list_start, 4u)) {
+          const auto *dl_ptr = reinterpret_cast<const std::uint32_t *>(rt.memory().raw_pointer(g_ge_list_start, 4u));
+          const std::uint32_t *dl_end = dl_ptr + 0x10000u;
+          void *vram_ptr = rt.memory().raw_pointer(0x04000000u, 0x200000u);
+          const auto &mem_vec = rt.memory().bytes();
+          if (vram_ptr) {
+              if (s_vcb_frame <= 5u) std::printf("[VCB-GE] frame=%u executing list=0x%08X\n", s_vcb_frame, g_ge_list_start);
+              d012::ge_exec(dl_ptr, dl_end, vram_ptr, 0x200000u, mem_vec.data(), mem_vec.size(), 0x08000000u);
+              g_ge_list_executed = true;
+          }
+      }
+      // Also execute render chain from DAT_09AF719C (built each frame by FUN_089AD370)
       { const std::uint32_t render_chain_root_va = 0x09AF719Cu;
         if (rt.memory().contains(render_chain_root_va, 4u)) {
             const std::uint32_t node_ptr = rt.memory().load32(render_chain_root_va) & 0x1FFFFFFFu;
-            if (s_vcb_frame <= 3u) {
-                std::printf("[VCB-DL] frame=%u node=0x%08X\n", s_vcb_frame, node_ptr);
-                if (node_ptr && rt.memory().contains(node_ptr, 64u)) {
-                    for (int _i = 0; _i < 16; ++_i)
-                        std::printf("  node[%d]=0x%08X\n", _i, rt.memory().load32(node_ptr + _i*4u));
-                }
-            }
-            if (node_ptr && rt.memory().contains(node_ptr, 4u)) {
+            if (s_vcb_frame <= 5u) std::printf("[VCB-CHAIN] frame=%u node_ptr=0x%08X\n", s_vcb_frame, node_ptr);
+            if (kBackupExecuteRenderChain && node_ptr && rt.memory().contains(node_ptr, 4u)) {
                 void *vram_ptr = rt.memory().raw_pointer(0x04000000u, 0x200000u);
                 const auto &mem_vec = rt.memory().bytes();
                 if (vram_ptr) {
-                    // The node is a struct; fields 4..7 (words 1..3) likely hold dl_start/dl_end.
-                    // Try each field as a potential DL start pointer.
-                    std::uint32_t dl_va = 0u;
-                    for (int _fi = 1; _fi <= 6 && !dl_va; ++_fi) {
-                        if (!rt.memory().contains(node_ptr + _fi*4u, 4u)) break;
-                        const std::uint32_t cand = rt.memory().load32(node_ptr + _fi*4u) & 0x1FFFFFFFu;
-                        if (cand >= 0x08000000u && cand < 0x0A000000u
-                            && rt.memory().contains(cand, 4u)) {
-                            // Peek: is it a plausible GE opcode?
-                            const std::uint32_t peek = rt.memory().load32(cand);
-                            const std::uint8_t op = static_cast<std::uint8_t>(peek >> 24);
-                            if (op == 0x08 || op == 0xA0 || op == 0xA2 || op == 0x04 || op == 0x9A || op == 0xD2 || op == 0x00) {
-                                dl_va = cand;
-                                if (s_vcb_frame <= 3u) std::printf("[VCB-DL] using field[%d]=0x%08X as DL start (op=0x%02X)\n", _fi, dl_va, op);
-                            }
-                        }
-                    }
-                    if (!dl_va) {
-                        // Fall back: use node_ptr directly (old behaviour)
-                        dl_va = node_ptr;
-                        if (s_vcb_frame <= 3u) std::printf("[VCB-DL] fallback: using node_ptr=0x%08X as DL start\n", dl_va);
-                    }
-                    const std::uint32_t *node_dl = reinterpret_cast<const std::uint32_t *>(
-                        rt.memory().raw_pointer(dl_va, 4u));
-                    if (node_dl)
-                        d012::ge_exec(node_dl, node_dl + 65536u, vram_ptr, 0x200000u,
-                                      mem_vec.data(), mem_vec.size(), 0x08000000u);
+                    const std::uint32_t *node_dl = reinterpret_cast<const std::uint32_t *>(rt.memory().raw_pointer(node_ptr, 4u));
+                    d012::ge_exec(node_dl, node_dl + 0x10000u, vram_ptr, 0x200000u, mem_vec.data(), mem_vec.size(), 0x08000000u);
                 }
             }
         }
       }
-      // Present back buffer.
-      { const auto &vram = rt.memory().vram_bytes();
-        constexpr std::size_t kBackOff = 0x44000u;
-        if (s_vcb_frame <= 5u) {
-            // Check both front buffer (0x44000) and back buffer at offset 0 (fbp=0)
-            auto count_nz = [&](std::size_t off) -> std::uint32_t {
-                if (off >= vram.size()) return 0u;
-                std::uint32_t n = 0;
-                const std::uint8_t *px = vram.data() + off;
-                const std::size_t tot = std::min(vram.size() - off, std::size_t(480*272*4));
-                for (std::size_t i = 0; i < tot; i += 4)
-                    if (px[i]|px[i+1]|px[i+2]|px[i+3]) ++n;
-                return n;
-            };
-            std::printf("[VCB-PRESENT] frame=%u nz_front(0x44000)=%u nz_back(0x0)=%u\n",
-                s_vcb_frame, count_nz(kBackOff), count_nz(0u));
-        }
-        // Present whichever buffer has pixels; prefer front (kBackOff), fall back to offset 0
-        auto pick_present = [&]() -> const std::uint8_t* {
-            if (kBackOff < vram.size()) {
-                const std::uint8_t *p = vram.data() + kBackOff;
-                for (std::size_t i = 0; i < std::min(vram.size()-kBackOff, std::size_t(4)); ++i)
-                    if (p[i]) return p;
+      // Also execute the GE slot DL (ring buffer)
+      { const std::uint32_t slot_ptr_va = 0x09AF6830u;
+        if (rt.memory().contains(slot_ptr_va, 4u)) {
+            const std::uint32_t slot_ptr = rt.memory().load32(slot_ptr_va);
+            if (slot_ptr && rt.memory().contains(slot_ptr, 12u)) {
+                const std::uint32_t dl_start    = rt.memory().load32(slot_ptr + 4u) & 0x1FFFFFFFu;
+                const std::uint32_t dl_end_addr = rt.memory().load32(slot_ptr + 8u) & 0x1FFFFFFFu;
+                if (kBackupExecuteSlotLists && dl_start && dl_end_addr > dl_start
+                    && (!kBackupRejectUnboundedGeLists || dl_end_addr - dl_start <= 0x1000u)
+                    && rt.memory().contains(dl_start, 4u) && rt.memory().contains(dl_end_addr - 4u, 4u)) {
+                    void *vram_ptr = rt.memory().raw_pointer(0x04000000u, 0x200000u);
+                    const auto &mem_vec = rt.memory().bytes();
+                    if (vram_ptr) {
+                        if (s_vcb_frame <= 5u) std::printf("[VCB-SLOT] frame=%u slot_dl=0x%08X..0x%08X\n", s_vcb_frame, dl_start, dl_end_addr);
+                        const auto *dl_ptr = reinterpret_cast<const std::uint32_t *>(rt.memory().raw_pointer(dl_start, 4u));
+                        const auto *dl_end = reinterpret_cast<const std::uint32_t *>(rt.memory().raw_pointer(dl_end_addr, 4u));
+                        d012::ge_exec(dl_ptr, dl_end, vram_ptr, 0x200000u, mem_vec.data(), mem_vec.size(), 0x08000000u);
+                    }
+                }
             }
-            return vram.data(); // GE fbp=0 back buffer
-        };
-        const std::uint8_t *present_buf = pick_present();
-        d012::display_present(present_buf, 512, 3 /* RGBA8888 — match fbfmt=3 */);
+        }
+      }
+      g_ge_list_start = 0u; // consumed
+      // ARCH-SYNTH: once scene 0x2713 (Square Enix logo) is in pending list but not yet active,
+      // restore the runtime-corrupted vtable at 0x089CAC90 and call FUN_088A2664(0.0f, 0x2713).
+      // The vtable at 0x089CAC90 gets overwritten by pool/BSS data at runtime; we restore it
+      // from the ELF (verified at file offset 0x1C7C68) before dispatching.
+      { constexpr bool kBackupSceneActivation = true;
+        // Keep disabled until the scene manager's render callback chain is
+        // reconstructed; enabling it promotes an incomplete node and causes
+        // unbounded malformed GE lists.
+        constexpr bool kBackupScenePromotion = true;
+        static bool s_scene_done=false;
+        if (kBackupSceneActivation && !s_scene_done) {
+            const std::uint32_t pending = aot_mem.aot_load32(0x09B4CF98u);
+            if (pending != 0u && aot_mem.aot_load32(0x09B48358u) == 0u) {
+                // Restore vtable at 0x089CAC90 from ELF values
+                constexpr std::uint32_t vt = 0x089CAC90u;
+                aot_mem.aot_store32(vt+0x00u, 0x00000000u);
+                aot_mem.aot_store32(vt+0x04u, 0x00000000u);
+                aot_mem.aot_store32(vt+0x08u, 0x00000000u);
+                aot_mem.aot_store32(vt+0x0Cu, 0x088A1C74u);
+                aot_mem.aot_store32(vt+0x10u, 0x00000000u);
+                aot_mem.aot_store32(vt+0x14u, 0x088A310Cu);
+                aot_mem.aot_store32(vt+0x18u, 0x00000000u);
+                aot_mem.aot_store32(vt+0x1Cu, 0x088A3188u);
+                aot_mem.aot_store32(vt+0x20u, 0x00000000u);
+                aot_mem.aot_store32(vt+0x24u, 0x088A31ACu);
+                aot_mem.aot_store32(vt+0x28u, 0x00000000u);
+                aot_mem.aot_store32(vt+0x2Cu, 0x088A31D4u);
+                aot_mem.aot_store32(vt+0x30u, 0x00000000u);
+                aot_mem.aot_store32(vt+0x34u, 0x088A31FCu);
+                aot_mem.aot_store32(vt+0x38u, 0x00000000u);
+                aot_mem.aot_store32(vt+0x3Cu, 0x088A3224u);
+                aot_mem.aot_store32(vt+0x40u, 0x00000000u);
+                aot_mem.aot_store32(vt+0x44u, 0x088A3248u);
+                aot_mem.aot_store32(vt+0x48u, 0x00000000u);
+                aot_mem.aot_store32(vt+0x4Cu, 0x088A3254u);
+                std::printf("[SCENE-ACT] pending=0x%08X vtable restored, calling FUN_088A2664\n",
+                            pending); fflush(stdout);
+                // Repair scene node fields in case FUN_088A2024 didn't run (cross-unit chain miss).
+                // These are the exact values FUN_088A2024 writes for a fresh node.
+                // The animation dispatcher indexes a two-entry callback
+                // table with this field; although FUN_088A2024 initializes
+                // it as a float in the original object, the reconstructed
+                // scene must use a valid table index here.
+                aot_mem.aot_store32(pending + 0x18u, 0u);
+                aot_mem.aot_store32(pending + 0x1Cu, 0x41A00000u); // float 20.0
+                aot_mem.aot_store32(pending + 0x20u, 0x3F800000u); // float 1.0
+                aot_mem.aot_store32(pending + 0x24u, 0x3F800000u); // float 1.0
+                aot_mem.aot_store32(pending + 0x28u, 0x00000000u);
+                // Backup activation enters FUN_088A1E44 in its transition
+                // state. State 0 only advances to 2 and deliberately does
+                // not invoke the scene vtable.
+                aot_mem.aot_store32(pending + 0x30u, 0x00000001u); // state = 1
+                aot_mem.aot_store32(pending + 0x34u, 0x000002F0u);
+                aot_mem.aot_store32(pending + 0x38u, 0xBF800000u); // float -1.0
+                aot_mem.aot_store32(pending + 0x3Cu, 0x00000000u);
+                aot_mem.aot_store32(pending + 0x40u, 0x00000000u);
+                aot_mem.aot_store32(pending + 0x44u, 0x00000000u);
+                aot_mem.aot_store32(pending + 0x48u, 0x00000000u);
+                aot_mem.aot_store32(pending + 0x54u, 0x00000000u);
+                // FUN_088A1E44 obtains the scene callback object from node+0x50,
+                // then reads its vtable pointer.  The partial archive path left
+                // this descriptor unset, so the state machine could never reach
+                // the ELF scene callbacks even though the node was promoted.
+                constexpr std::uint32_t scene_desc = 0x09FE0200u;
+                aot_mem.aot_store32(scene_desc + 0x00u, 0x089CAC90u);
+                aot_mem.aot_store32(scene_desc + 0x04u, 0x00002713u);
+                aot_mem.aot_store32(scene_desc + 0x08u, 0xFFFFFFFFu);
+                aot_mem.aot_store32(scene_desc + 0x0Cu, 0x00000001u);
+                aot_mem.aot_store32(scene_desc + 0x10u, 0x00000000u);
+                aot_mem.aot_store16(scene_desc + 0x18u, 0u);
+                aot_mem.aot_store32(pending + 0x50u, scene_desc);
+                std::printf("[SCENE-DESC] desc=0x%08X vt=0x%08X type=0x%08X res=0x%08X\n",
+                    scene_desc, aot_mem.aot_load32(scene_desc), aot_mem.aot_load32(scene_desc+4u),
+                    aot_mem.aot_load32(scene_desc+8u)); fflush(stdout);
+                std::printf("[SCENE-ACT] node fields repaired, calling FUN_088A2664\n"); fflush(stdout);
+                const std::uint32_t save_ra  = ctx.gpr[31];
+                const std::uint32_t save_a0  = ctx.gpr[4];
+                const float         save_f12 = ctx.fpr[12];
+                ctx.fpr[12] = 0.0f;
+                // FUN_088A2664(0, 0x2713): $a0 is the float/transition
+                // parameter and must be zero; do not inherit the caller's
+                // stale value (which can dispatch an invalid scene path).
+                ctx.gpr[4]  = 0u;
+                ctx.gpr[5]  = 0x2713u;
+                ctx.gpr[31] = 0x089C5B00u;
+                ctx.pc      = 0x088A2664u;
+                (void)rt.invoke_chained_direct<&recomp_unit_0004_entry, 4u, 5051u, 0x088A2664u>(ctx, &aot_mem);
+                ctx.gpr[31] = save_ra;
+                ctx.gpr[4]  = save_a0;
+                ctx.fpr[12] = save_f12;
+                // The generated FUN_088A2664 currently exits before its
+                // indirect vtable dispatch. Continue through the original
+                // guest callback so the scene can perform its real resource
+                // setup; this is not a renderer or host-side image path.
+                if (aot_mem.aot_load32(0x09B48358u) == 0u) {
+                    std::printf("[SCENE-FALLBACK] dispatching original 0x088A3188 guest callback\n"); fflush(stdout);
+                    ctx.gpr[4] = scene_desc;
+                    ctx.gpr[5] = 0u;
+                    ctx.gpr[31] = 0x089C5B00u;
+                    ctx.pc = 0x088A3188u;
+                    (void)rt.invoke_chained_call(ctx, &aot_mem);
+                    ctx.gpr[31] = save_ra;
+                    ctx.gpr[4] = save_a0;
+                }
+                std::printf("[SCENE-ACT] done, active=0x%08X\n",
+                            aot_mem.aot_load32(0x09B48358u)); fflush(stdout);
+                // The generated scene-manager path can complete without
+                // updating the active-root global in this partial port. Keep
+                // this promotion independently switchable for rollback.
+                if (kBackupScenePromotion &&
+                    aot_mem.aot_load32(0x09B48358u) == 0u &&
+                    aot_mem.aot_load32(pending + 0x58u) == 0u) {
+                    aot_mem.aot_store32(0x09B48358u, pending);
+                    aot_mem.aot_store32(0x09B4835Cu, pending);
+                    aot_mem.aot_store32(0x09B4CF98u, 0u);
+                    aot_mem.aot_store32(0x09B4CF9Cu, 0u);
+                    std::printf("[SCENE-ACT] backup promotion active=0x%08X\n",
+                                pending); fflush(stdout);
+                }
+                s_scene_done = true;
+            }
+        }
+      }
+      // Present: use the framebuffer address set by sceDisplaySetFrameBuf.
+      { const auto &vram = rt.memory().vram_bytes();
+        const d012::DisplayFbInfo &fb = d012::g_display_fb;
+        // fb.vaddr is a PSP virtual address (0x04000000 base for VRAM).
+        const std::uint32_t vram_off = fb.vaddr & 0x1FFFFFu; // VRAM-relative offset
+        const std::size_t stride = (fb.stride > 0) ? fb.stride : 512u;
+        const std::size_t bpp    = (fb.fmt == 3) ? 4u : 2u;
+        const std::size_t fb_bytes = stride * 272u * bpp;
+        if (s_vcb_frame <= 5u)
+            std::printf("[VCB-PRESENT] frame=%u vaddr=0x%08X off=0x%X stride=%zu fmt=%d\n",
+                        s_vcb_frame, fb.vaddr, vram_off, stride, fb.fmt);
+        const std::uint8_t *fb_ptr = (vram_off + fb_bytes <= vram.size())
+            ? vram.data() + vram_off : vram.data();
+        d012::display_present(fb_ptr, static_cast<int>(stride), fb.fmt);
       }
       static auto s_vblank_cb_start = std::chrono::steady_clock::now();
       const auto now = std::chrono::steady_clock::now();
@@ -4459,14 +4573,14 @@ L_089C5AD0: // sceDisplayWaitVblankStart() — wait until next 16ms boundary, ex
             const std::uint32_t node_ptr = rt.memory().load32(render_chain_root_va) & 0x1FFFFFFFu;
             if (s_vblank_frame <= 5u)
                 std::printf("[VSYNC-DL] frame=%u node_ptr=0x%08X\n", s_vblank_frame, node_ptr);
-            if (node_ptr && rt.memory().contains(node_ptr, 4u)) {
+            if (kBackupExecuteRenderChain && node_ptr && rt.memory().contains(node_ptr, 4u)) {
                 void *vram_ptr = rt.memory().raw_pointer(0x04000000u, 0x200000u);
                 const auto &mem_vec = rt.memory().bytes();
                 if (vram_ptr) {
                     const std::uint32_t *node_dl = reinterpret_cast<const std::uint32_t *>(
                         rt.memory().raw_pointer(node_ptr, 4u));
                     d012::ge_exec(node_dl, node_dl + 65536u, vram_ptr, 0x200000u,
-                                  mem_vec.data(), mem_vec.size(), 0x08000000u);
+                                  mem_vec.data(), mem_vec.size(), 0x04000000u);
                 }
             }
         }
@@ -4481,6 +4595,7 @@ L_089C5AD0: // sceDisplayWaitVblankStart() — wait until next 16ms boundary, ex
                 const std::uint32_t dl_start    = rt.memory().load32(slot_ptr + 4u) & 0x1FFFFFFFu;
                 const std::uint32_t dl_end_addr = rt.memory().load32(slot_ptr + 8u) & 0x1FFFFFFFu;
                 if (dl_start && dl_end_addr > dl_start
+                    && (!kBackupRejectUnboundedGeLists || dl_end_addr - dl_start <= 0x1000u)
                     && rt.memory().contains(dl_start, 4u)
                     && rt.memory().contains(dl_end_addr - 4u, 4u)) {
                     void *vram_ptr = rt.memory().raw_pointer(0x04000000u, 0x200000u);
@@ -4491,26 +4606,25 @@ L_089C5AD0: // sceDisplayWaitVblankStart() — wait until next 16ms boundary, ex
                         const auto *dl_end = reinterpret_cast<const std::uint32_t *>(
                             rt.memory().raw_pointer(dl_end_addr, 4u));
                         d012::ge_exec(dl_ptr, dl_end, vram_ptr, 0x200000u,
-                                      mem_vec.data(), mem_vec.size(), 0x08000000u);
+                                      mem_vec.data(), mem_vec.size(), 0x04000000u);
                     }
                 }
             }
         }
       }
-      // Present the back buffer (VRAM+0x44000 = buf at 0x04044000).
+      // Present using the framebuffer set by sceDisplaySetFrameBuf.
       { const auto &vram = rt.memory().vram_bytes();
-        constexpr std::size_t kBackOff = 0x44000u; // standard PSP back buffer offset
-        if (kBackOff < vram.size()) {
-            if (s_vblank_frame <= 5u) {
-                std::uint32_t nz = 0;
-                const std::uint8_t *px = vram.data() + kBackOff;
-                const std::size_t total = std::min(vram.size() - kBackOff, std::size_t(480*272*4));
-                for (std::size_t i = 0; i < total; i += 4)
-                    if (px[i]|px[i+1]|px[i+2]|px[i+3]) ++nz;
-                std::printf("[VSYNC-PRESENT] frame=%u non_zero=%u\n", s_vblank_frame, nz);
-            }
-            d012::display_present(vram.data() + kBackOff, 512, 1 /* RGBA5551 */);
-        }
+        const d012::DisplayFbInfo &fb = d012::g_display_fb;
+        const std::uint32_t vram_off = fb.vaddr & 0x1FFFFFu;
+        const std::size_t stride = (fb.stride > 0) ? fb.stride : 512u;
+        const std::size_t bpp    = (fb.fmt == 3) ? 4u : 2u;
+        const std::size_t fb_bytes = stride * 272u * bpp;
+        if (s_vblank_frame <= 5u)
+            std::printf("[VSYNC-PRESENT] frame=%u vaddr=0x%08X off=0x%X stride=%zu fmt=%d\n",
+                        s_vblank_frame, fb.vaddr, vram_off, stride, fb.fmt);
+        const std::uint8_t *fb_ptr = (vram_off + fb_bytes <= vram.size())
+            ? vram.data() + vram_off : vram.data();
+        d012::display_present(fb_ptr, static_cast<int>(stride), fb.fmt);
       }
       // Wait for the next 16ms boundary.
       const auto now = std::chrono::steady_clock::now();

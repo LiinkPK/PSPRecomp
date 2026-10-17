@@ -13659,13 +13659,6 @@ L_08869AAC:
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
 L_08869AB4:
-    if (ctx.gpr[4] < 0x08000000u) { // guard: a0 is not a valid PSP pointer (e.g. a UID); skip iteration
-        { static bool once=false; if(!once){once=true; std::printf("[08869AB4] invalid a0=0x%08X skipped\n",ctx.gpr[4]); fflush(stdout);} }
-        ctx.gpr[2] = 0u;
-        jump_target = ctx.gpr[31]; ctx.pc = jump_target; local_pc = jump_target;
-        if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
-        return;
-    }
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-32));
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(0), ctx.gpr[16]);
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(4), ctx.gpr[17]);
@@ -13677,9 +13670,6 @@ L_08869AB4:
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(20), ctx.gpr[31]);
     ctx.gpr[4] = (aot_mem.aot_load32(ctx.gpr[17] + static_cast<std::uint32_t>(0)));
     ctx.gpr[19] = (0u | 0u);
-    if (ctx.gpr[4] < 0x08000000u) { // guard: sub-ptr is a UID/junk, treat as empty list
-        goto L_08869B3C;
-    }
     ctx.gpr[20] = (aot_mem.aot_load32(ctx.gpr[4] + static_cast<std::uint32_t>(8)));
     ctx.gpr[4] = (static_cast<std::int32_t>(ctx.gpr[19]) < static_cast<std::int32_t>(ctx.gpr[20]) ? 1u : 0u);
     { const bool branch_taken = ctx.gpr[4] == 0u;
@@ -13697,7 +13687,7 @@ L_08869AF0:
 L_08869AFC:
     ctx.gpr[18] = (ctx.gpr[2] | 0u);
     ctx.gpr[4] = (aot_mem.aot_load32(ctx.gpr[18] + static_cast<std::uint32_t>(0)));
-    { const bool branch_taken = ctx.gpr[4] == 0u || ctx.gpr[4] < 0x08000000u; // guard: skip invalid name ptr
+    { const bool branch_taken = ctx.gpr[4] == 0u;
     ctx.gpr[5] = (ctx.gpr[4] | 0u);
       if (branch_taken) {
           goto L_08869B1C;
@@ -14271,6 +14261,10 @@ L_0886A0A4:
     ctx.gpr[7] = (0u | 0u);
     ctx.gpr[31] = (0x0886A0D8u);
     ctx.gpr[9] = (0u | 0u);
+    if (ctx.gpr[4] < 0x08000000u) { // guard: null/invalid allocator ptr — skip alloc, return 0
+        { static bool s_once=false; if(!s_once){s_once=true; std::printf("[0886A0C8] skipped FUN_0885C6CC a0=0x%08X\n",ctx.gpr[4]); fflush(stdout);} }
+        ctx.gpr[2] = 0u; goto L_0886A0D8;
+    }
     if (rt.invoke_chained_direct<&recomp_unit_0002_entry, 2u, 3993u, 0x0885C6CCu>(ctx, &aot_mem) && ctx.pc == 0x0886A0D8u) goto L_0886A0D8;
     return;
 L_0886A0D8:
@@ -35291,6 +35285,41 @@ L_088754A8:
           aot_mem.aot_store32(STATE_PTR, 4u);
           static bool once=false; if(!once){once=true; std::printf("[SYNTH-S3->4] advanced loading state 3->4\n"); fflush(stdout);}
       }
+      // ARCH-SYNTH: force 603A=0 so that when state=0, 6039=1, 603B=1 the scene transition fires.
+      // 603A=1 skips the scene call and goes to countdown; we want the Square Enix logo.
+      if (aot_mem.aot_load8(0x089D6039u) != 0u && cur_state == 0u) {
+          if (aot_mem.aot_load8(0x089D603Au) != 0u) {
+              aot_mem.aot_store8(0x089D603Au, 0u);
+              static bool once2=false; if(!once2){once2=true; std::printf("[SYNTH-603A] cleared 603A to allow scene transition\n"); fflush(stdout);}
+          }
+      }
+      // Scene activation is handled by ARCH-SYNTH in generated_unit_0014.cpp (VCB path, every frame).
+      // Removed duplicate from here to avoid double-call before vtable is restored.
+      { static bool scene_activated=false;
+        if (!scene_activated) {
+            const std::uint32_t pending = aot_mem.aot_load32(0x09B4CF98u);
+            const std::uint32_t active  = aot_mem.aot_load32(0x09B48358u);
+            if (pending != 0u && active != 0u) {
+                scene_activated = true;
+                std::printf("[SCENE-ACTIVE] scene entered active list=0x%08X\n", active); fflush(stdout);
+                std::printf("[SYNTH-ACTIVATE] FUN_088A2664 returned, active list now=0x%08X\n", aot_mem.aot_load32(0x09B48358u)); fflush(stdout);
+            }
+        }
+      }
+      // Debug: check scene manager init flag and scene pool for transition gate
+      { static std::uint32_t s_dbg=0; if(++s_dbg<=3u||s_dbg==100u){
+          const std::uint32_t s6c98 = aot_mem.aot_load32(0x089D6C98u);
+          const std::uint32_t sb4d2a0 = aot_mem.aot_load32(0x09B4D2A0u);
+          const std::uint32_t pool_cnt = sb4d2a0 ? aot_mem.aot_load32(sb4d2a0+0x600u) : 0u;
+          const std::uint32_t s6030 = aot_mem.aot_load32(0x089D6030u);
+          const std::uint32_t s6039 = aot_mem.aot_load8(0x089D6039u);
+          const std::uint32_t s603a = aot_mem.aot_load8(0x089D603Au);
+          const std::uint32_t s603b = aot_mem.aot_load8(0x089D603Bu);
+          std::printf("[SCENE-DBG#%u] 6c98=0x%08X 9b4d2a0=0x%08X pool_cnt=%u state=%u 6039=%u 603a=%u 603b=%u pending=0x%08X active=0x%08X\n",
+              s_dbg, s6c98, sb4d2a0, pool_cnt, s6030, s6039, s603a, s603b,
+              aot_mem.aot_load32(0x09B4CF98u), aot_mem.aot_load32(0x09B48358u));
+          std::fflush(stdout);
+      }}
     }
     ctx.gpr[31] = (0x088754B0u);
     ctx.gpr[4] = (ctx.gpr[2] | 0u);
@@ -54201,6 +54230,12 @@ L_0888251C:
           std::printf("[TASK] dispatch #%u task=0x%08X fn=0x%08X (tbl0=0x%08X)\n", s_dispatch_count, ctx.gpr[19], ctx.gpr[5], cur_tbl0);
           std::fflush(stdout);
       }
+      constexpr bool kBackupSchedulerPassLimit = true;
+      // One complete task-list pass is eight tasks in this title.  The
+      // reconstructed list can re-enter itself after that pass; returning
+      // here lets VBlank advance and gives the title asset loader a turn.
+      if (kBackupSchedulerPassLimit && (s_dispatch_count % 8u) == 0u)
+          goto L_08882590;
     }
     jump_target = ctx.gpr[5];
     ctx.gpr[31] = (0x08882530u);
@@ -54214,6 +54249,20 @@ L_0888251C:
       const std::uint32_t sched_gpr19_saved = ctx.gpr[19]; // save gpr[19]=s3 (task ptr)
       const std::uint32_t sched_gpr20_saved = ctx.gpr[20]; // save gpr[20]=s4
       const std::uint32_t sched_gpr21_saved = ctx.gpr[21]; // save gpr[21]=s5
+      // Backup switch: FUN_088A1AE4 is a maintenance task, not the scene
+      // renderer. In the incomplete task graph it monopolizes dispatch and
+      // prevents the VSync task from advancing frames.
+      constexpr bool kBackupSkipMaintenanceTask = true;
+      if (kBackupSkipMaintenanceTask && task_fn_saved == 0x088A1AE4u) {
+          ctx.gpr[16] = sched_gpr16_saved;
+          ctx.gpr[17] = sched_gpr17_saved;
+          ctx.gpr[18] = sched_gpr18_saved;
+          ctx.gpr[19] = sched_gpr19_saved;
+          ctx.gpr[20] = sched_gpr20_saved;
+          ctx.gpr[21] = sched_gpr21_saved;
+          ctx.gpr[29] = sched_sp_saved;
+          goto L_08882538;
+      }
       int chain_iters = 0;
       while (true) {
           bool ok = rt.invoke_chained_call(ctx, &aot_mem);

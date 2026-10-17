@@ -1,4 +1,4 @@
-﻿#include "psprecomp/runtime.hpp"
+#include "psprecomp/runtime.hpp"
 #include "generated_units.hpp"
 #include <bit>
 #include <cmath>
@@ -6406,10 +6406,117 @@ LOCAL_DISPATCH:
         case 0x088CE2F8u: { extern void init_088CE2F8_entry(psprecomp::Runtime&, psprecomp::AllegrexContext&, std::uint16_t, psprecomp::GuestMemory::AotFastView&); init_088CE2F8_entry(rt, ctx, 1u, aot_mem); return; }
 
 
+        case 0x088A3254u: goto L_088A3254;
+        case 0x088A3188u: goto L_088A3188;
+        case 0x088A31ACu: goto L_088A31AC;
+        case 0x088A31D4u: goto L_088A31D4;
+        case 0x088A31FCu: goto L_088A31FC;
+        case 0x088A3224u: goto L_088A3224;
+        case 0x088A3248u: goto L_088A3248;
+        case 0x088A310Cu: goto L_088A310C;
+        case 0x088A1C74u: goto L_088A1C74;
+
     default:
         ctx.pc = local_pc;
         return;
     }
+// Scene vtable stubs for type 0x2713 (Square Enix logo). ELF-verified at 0x089CAC90.
+L_088A3254: // type-getter: return *(a0+4) = scene type id
+    ctx.gpr[2] = aot_mem.aot_load32(ctx.gpr[4] + 4u);
+    jump_target = ctx.gpr[31]; ctx.pc = jump_target; local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+    return;
+L_088A3188: // scene start stub — called by FUN_088A1E44 when state==1
+    { static bool once=false; if(!once){once=true; std::printf("[SCENE-START] 088A3188 calling FUN_088A1758 a0=0x%08X\n",ctx.gpr[4]);fflush(stdout);} }
+    // Original body: FUN_088A1758(DAT_089D6C88, *(scene + 8)).
+    // The previous stub returned immediately, so the 0x2713 scene could
+    // activate but never submit its original title resource sequence.
+    {
+        const std::uint32_t scene = ctx.gpr[4];
+        const std::uint32_t manager = (2205u << 16u) + 0x6C88u;
+        const std::uint32_t save_ra = ctx.gpr[31];
+        const std::uint32_t save_a0 = ctx.gpr[4];
+        const std::uint32_t save_a1 = ctx.gpr[5];
+        ctx.gpr[4] = manager;
+        ctx.gpr[5] = aot_mem.aot_load32(scene + 8u);
+        ctx.gpr[31] = 0u;
+        ctx.pc = 0x088A1758u;
+        (void)rt.invoke_chained_call(ctx, &aot_mem);
+        ctx.gpr[31] = save_ra;
+        ctx.gpr[4] = save_a0;
+        ctx.gpr[5] = save_a1;
+    }
+    jump_target = ctx.gpr[31]; ctx.pc = jump_target; local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+    return;
+L_088A31AC:
+    {
+        const std::uint32_t scene = ctx.gpr[4];
+        const std::uint32_t ra = ctx.gpr[31];
+        ctx.gpr[4] = (2205u << 16u) + 0x6C88u;
+        ctx.gpr[5] = aot_mem.aot_load32(scene + 8u);
+        ctx.gpr[6] = ctx.gpr[5];
+        ctx.gpr[31] = 0u;
+        ctx.pc = 0x088A17A4u;
+        (void)rt.invoke_chained_call(ctx, &aot_mem);
+        ctx.gpr[31] = ra;
+    }
+    jump_target = ctx.gpr[31]; ctx.pc = jump_target; local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+    return;
+L_088A31D4:
+    {
+        const std::uint32_t scene = ctx.gpr[4];
+        const std::uint32_t ra = ctx.gpr[31];
+        ctx.gpr[4] = (2205u << 16u) + 0x6C88u;
+        ctx.gpr[5] = aot_mem.aot_load32(scene + 8u);
+        ctx.gpr[6] = aot_mem.aot_load32(scene + 12u);
+        ctx.gpr[31] = 0u;
+        ctx.pc = 0x088A17C4u;
+        (void)rt.invoke_chained_call(ctx, &aot_mem);
+        ctx.gpr[31] = ra;
+    }
+    jump_target = ctx.gpr[31]; ctx.pc = jump_target; local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+    return;
+L_088A31FC:
+    {
+        const std::uint32_t scene = ctx.gpr[4];
+        const std::uint32_t ra = ctx.gpr[31];
+        ctx.gpr[4] = (2205u << 16u) + 0x6C88u;
+        ctx.gpr[5] = aot_mem.aot_load32(scene + 8u);
+        ctx.gpr[31] = 0u;
+        ctx.pc = 0x088A183Cu;
+        (void)rt.invoke_chained_call(ctx, &aot_mem);
+        ctx.gpr[31] = ra;
+    }
+    jump_target = ctx.gpr[31]; ctx.pc = jump_target; local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+    return;
+L_088A3224:
+    {
+        const std::uint32_t scene = ctx.gpr[4];
+        const std::uint32_t ra = ctx.gpr[31];
+        ctx.gpr[4] = (2205u << 16u) + 0x6C88u;
+        ctx.gpr[5] = aot_mem.aot_load32(scene + 8u);
+        ctx.gpr[31] = 0u;
+        ctx.pc = 0x088A1894u;
+        (void)rt.invoke_chained_call(ctx, &aot_mem);
+        ctx.gpr[31] = ra;
+    }
+    jump_target = ctx.gpr[31]; ctx.pc = jump_target; local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+    return;
+L_088A3248:
+    ctx.gpr[2] = aot_mem.aot_load32(ctx.gpr[4] + 0x10u) & 1u;
+    jump_target = ctx.gpr[31]; ctx.pc = jump_target; local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+    return;
+L_088A310C: L_088A1C74:
+    ctx.gpr[2] = 0u;
+    jump_target = ctx.gpr[31]; ctx.pc = jump_target; local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+    return;
 L_088C4BB0:
     ctx.gpr[29] = (ctx.gpr[29] + static_cast<std::uint32_t>(-16));
     aot_mem.aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(8), ctx.gpr[16]);
@@ -29696,6 +29803,24 @@ L_088D2A84:
               arch, arch_hdr, arch_hdr8, (int)arch_empty, kb2);
           fflush(stdout);
       }}
+      // MPK stores name/data locations as file-relative offsets.  The guest
+      // archive routines consume the expanded table as pointers.
+      if (arch_hdr && arch_hdr8 > 0u && arch_hdr8 < 0x1000u) {
+          static std::uint32_t s_relocated_arch = 0u;
+          if (s_relocated_arch != arch_hdr) {
+              const std::uint32_t table = arch_hdr + 16u;
+              for (std::uint32_t i = 0; i < arch_hdr8; ++i) {
+                  const std::uint32_t row = table + i * 16u;
+                  const std::uint32_t name_off = aot_mem.aot_load32(row + 0u);
+                  const std::uint32_t data_off = aot_mem.aot_load32(row + 4u);
+                  if (name_off < 0x00080000u) aot_mem.aot_store32(row + 0u, arch_hdr + name_off);
+                  if (data_off < 0x00080000u) aot_mem.aot_store32(row + 4u, arch_hdr + data_off);
+              }
+              s_relocated_arch = arch_hdr;
+              std::printf("[MPK-RELOC] table=0x%08X entries=%u base=0x%08X\\n", table, arch_hdr8, arch_hdr);
+              fflush(stdout);
+          }
+      }
       if (arch_empty && key && key >= 0x08800000u && key < 0x0A000000u) {
           // Read the key string from guest memory
           char kb[64] = {};
@@ -29734,6 +29859,15 @@ L_088D2A84:
     if (rt.invoke_chained_direct<&recomp_unit_0003_entry, 3u, 876u, 0x08869AB4u>(ctx, &aot_mem) && ctx.pc == 0x088D2A8Cu) goto L_088D2A8C;
     return;
 L_088D2A8C:
+    if (ctx.gpr[2] != 0u) {
+        static unsigned s_entry_log = 0u;
+        if (s_entry_log++ < 4u) {
+            std::printf("[MPK-ENTRY] result=0x%08X f0=%08X f4=%08X f8=%08X fc=%08X\\n", ctx.gpr[2],
+                        aot_mem.aot_load32(ctx.gpr[2] + 0u), aot_mem.aot_load32(ctx.gpr[2] + 4u),
+                        aot_mem.aot_load32(ctx.gpr[2] + 8u), aot_mem.aot_load32(ctx.gpr[2] + 12u));
+            fflush(stdout);
+        }
+    }
     if (ctx.gpr[2] == 0u) { // FUN_08869AB4 returned null - go to "not found" path
         { static bool once=false; if(!once){once=true; std::printf("[088D2A8C] FUN_08869AB4 returned null, taking not-found path\n"); fflush(stdout);} }
         goto L_088D2AA0;
@@ -46403,6 +46537,13 @@ L_088DC774:
     if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
     return;
 L_088DC7A8:
+    if (ctx.gpr[31] == 0x088DC8FCu) {
+        std::printf("[MPK-SIZE-FIELDS] obj=0x%08X f60=%08X f64=%08X f68=%08X f72=%08X f76=%08X f80=%08X f88=%08X\\n",
+                    ctx.gpr[4], aot_mem.aot_load32(ctx.gpr[4] + 60u), aot_mem.aot_load32(ctx.gpr[4] + 64u),
+                    aot_mem.aot_load32(ctx.gpr[4] + 68u), aot_mem.aot_load32(ctx.gpr[4] + 72u),
+                    aot_mem.aot_load32(ctx.gpr[4] + 76u), aot_mem.aot_load32(ctx.gpr[4] + 80u),
+                    aot_mem.aot_load32(ctx.gpr[4] + 88u));
+    }
     ctx.gpr[5] = (aot_mem.aot_load32(ctx.gpr[4] + static_cast<std::uint32_t>(60)));
     ctx.gpr[6] = (aot_mem.aot_load32(ctx.gpr[4] + static_cast<std::uint32_t>(64)));
     ctx.gpr[7] = (aot_mem.aot_load32(ctx.gpr[4] + static_cast<std::uint32_t>(68)));
@@ -46412,6 +46553,13 @@ L_088DC7A8:
     ctx.gpr[7] = (aot_mem.aot_load32(ctx.gpr[4] + static_cast<std::uint32_t>(76)));
     ctx.gpr[5] = (ctx.gpr[5] + ctx.gpr[6]);
     ctx.gpr[6] = (aot_mem.aot_load32(ctx.gpr[4] + static_cast<std::uint32_t>(80)));
+    // The size aggregate contains a byte-count here; a poisoned 0xEFxxxxxx
+    // value is an invalid pointer leaked by the failed archive sub-allocation.
+    // Do not let it turn the following guest memset into an unbounded write.
+    if (ctx.gpr[6] >= 0x0A000000u) {
+        std::printf("[MPK-SIZE-GUARD] invalid +80=0x%08X, using zero\\n", ctx.gpr[6]);
+        ctx.gpr[6] = 0u;
+    }
     ctx.gpr[4] = (aot_mem.aot_load32(ctx.gpr[4] + static_cast<std::uint32_t>(88)));
     ctx.gpr[5] = (ctx.gpr[5] + ctx.gpr[7]);
     ctx.gpr[2] = (ctx.gpr[5] + ctx.gpr[6]);
@@ -46545,6 +46693,9 @@ L_088DC8FC:
     ctx.gpr[8] = (0u | 1u);
     ctx.gpr[4] = (aot_mem.aot_load32(ctx.gpr[4] + static_cast<std::uint32_t>(4)));
     ctx.gpr[5] = (ctx.gpr[2] | 0u);
+    static std::uint32_t s_mpk_object_size = 0u;
+    s_mpk_object_size = ctx.gpr[5];
+    std::printf("[MPK-ALLOC] requested=0x%08X\\n", s_mpk_object_size);
     ctx.gpr[6] = (0u | 0u);
     ctx.gpr[7] = (0u | 0u);
     ctx.gpr[31] = (0x088DC920u);
@@ -46552,6 +46703,12 @@ L_088DC8FC:
     if (rt.invoke_chained_direct<&recomp_unit_0002_entry, 2u, 3993u, 0x0885C6CCu>(ctx, &aot_mem) && ctx.pc == 0x088DC920u) goto L_088DC920;
     return;
 L_088DC920:
+    if (ctx.gpr[2] < 0x08800000u || ctx.gpr[2] >= 0x0A000000u) {
+        static std::uint32_t s_mpk_obj_pool = 0x09FA0000u;
+        ctx.gpr[2] = s_mpk_obj_pool;
+        s_mpk_obj_pool += (s_mpk_object_size + 255u) & ~255u;
+        for (std::uint32_t z = 0; z < s_mpk_object_size; z += 4u) aot_mem.aot_store32(ctx.gpr[2] + z, 0u);
+    }
     aot_mem.aot_store32(ctx.gpr[17] + static_cast<std::uint32_t>(92), ctx.gpr[2]);
     ctx.gpr[31] = (0x088DC92Cu);
     ctx.gpr[4] = (ctx.gpr[17] | 0u);
@@ -46921,6 +47078,7 @@ L_088DCC14:
     ctx.gpr[6] = (0u | 0u);
     goto L_088DC944;
 L_088DCC24:
+    { static unsigned n=0; if(n++<4) { std::printf("[MPK-DCC24] s0=0x%08X a0=0x%08X v0=0x%08X ra=0x%08X\n",ctx.gpr[16],ctx.gpr[4],ctx.gpr[2],ctx.gpr[31]); fflush(stdout); } }
     ctx.gpr[4] = (ctx.gpr[16] | 0u);
     ctx.gpr[5] = (ctx.gpr[2] | 0u);
     ctx.gpr[6] = (0u | 0u);
@@ -49153,6 +49311,10 @@ L_088DDDA0:
     if (rt.invoke_chained_direct<&recomp_unit_0009_entry, 9u, 2651u, 0x08935524u>(ctx, &aot_mem) && ctx.pc == 0x088DDDB0u) goto L_088DDDB0;
     return;
 L_088DDDB0:
+    if (ctx.gpr[19] < 0x08800000u || ctx.gpr[19] >= 0x0A000000u) {
+        std::printf("[MPK-RECORD-SKIP] invalid copy destination s3=0x%08X\\n", ctx.gpr[19]);
+        goto L_088DDE00;
+    }
     ctx.gpr[4] = (ctx.gpr[19] + static_cast<std::uint32_t>(78));
     ctx.gpr[5] = (ctx.gpr[18] + static_cast<std::uint32_t>(46));
     ctx.gpr[31] = (0x088DDDC0u);
@@ -49160,6 +49322,21 @@ L_088DDDB0:
     if (rt.invoke_chained_direct<&recomp_unit_0009_entry, 9u, 2651u, 0x08935524u>(ctx, &aot_mem) && ctx.pc == 0x088DDDC0u) goto L_088DDDC0;
     return;
 L_088DDDC0:
+    { static unsigned s_rec_log = 0u;
+      if (s_rec_log++ < 6u) {
+          std::printf("[MPK-RECORD] s0=%08X s1=%08X s2=%08X s3=%08X s4=%08X s5=%08X s6=%08X s7=%08X\\n",
+                      ctx.gpr[16], ctx.gpr[17], ctx.gpr[18], ctx.gpr[19], ctx.gpr[20], ctx.gpr[21], ctx.gpr[22], ctx.gpr[23]);
+          fflush(stdout);
+      }
+    }
+    // A malformed internal record must not turn its destination field into a
+    // host/random pointer.  Preserve the original parser flow by completing
+    // the current package without emitting that one record.
+    if (ctx.gpr[16] < 0x08800000u || ctx.gpr[16] >= 0x0A000000u ||
+        ctx.gpr[19] < 0x08800000u || ctx.gpr[19] >= 0x0A000000u) {
+        std::printf("[MPK-RECORD-SKIP] invalid destination s0=0x%08X s3=0x%08X\\n", ctx.gpr[16], ctx.gpr[19]);
+        goto L_088DDE00;
+    }
     ctx.gpr[4] = (ctx.gpr[20] + static_cast<std::uint32_t>(3));
     goto L_088DDDC4;
 L_088DDDC4:
@@ -68699,5 +68876,15 @@ void register_generated_unit_6(Runtime &runtime) {
     runtime.register_function(0x088E3FD4u, &recomp_unit_0006, "recomp_unit_0006");
     runtime.register_function(0x088E4004u, &recomp_unit_0006, "recomp_unit_0006");
     runtime.register_function(0x088E4020u, &recomp_unit_0006, "recomp_unit_0006");
+    // Scene vtable helpers for type 0x2713 (Square Enix logo) — not in original unit output
+    runtime.register_function(0x088A3254u, &recomp_unit_0006, "recomp_unit_0006");
+    runtime.register_function(0x088A3188u, &recomp_unit_0006, "recomp_unit_0006");
+    runtime.register_function(0x088A31ACu, &recomp_unit_0006, "recomp_unit_0006");
+    runtime.register_function(0x088A31D4u, &recomp_unit_0006, "recomp_unit_0006");
+    runtime.register_function(0x088A31FCu, &recomp_unit_0006, "recomp_unit_0006");
+    runtime.register_function(0x088A3224u, &recomp_unit_0006, "recomp_unit_0006");
+    runtime.register_function(0x088A3248u, &recomp_unit_0006, "recomp_unit_0006");
+    runtime.register_function(0x088A310Cu, &recomp_unit_0006, "recomp_unit_0006");
+    runtime.register_function(0x088A1C74u, &recomp_unit_0006, "recomp_unit_0006");
 }
 } // namespace psprecomp

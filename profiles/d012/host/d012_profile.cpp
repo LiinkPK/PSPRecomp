@@ -1,4 +1,5 @@
 #include "d012_profile.hpp"
+#include "ge_render.hpp"
 #include "psprecomp/runtime.hpp"
 #include "psprecomp/elf32.hpp"
 
@@ -16,10 +17,25 @@
 
 namespace psprecomp { extern std::uint64_t g_runtime_starvation_interval_fast; }
 
+// Frame-complete recovery address: set by FUN_08933458 before calling FUN_08882250.
+// When the task dispatch exits via null-pc (ra=0), invoke_chained_call in runtime.cpp
+// calls this hook to get the recovery PC, allowing the frame loop to continue.
+namespace psprecomp {
+std::uint32_t g_frame_recovery_pc = 0u;
+extern std::uint32_t (*g_frame_complete_hook)();
+extern std::uint32_t g_frame_reset_sp;
+extern std::uint32_t g_ge_list_start;
+extern std::uint32_t g_ge_exec_cursor;
+extern bool          g_ge_list_executed;
+}
+
 namespace d012 {
 
 // Game root directory set from main.cpp before any file I/O
 std::string g_game_root;
+
+// Display framebuffer info: updated by sceDisplaySetFrameBuf
+DisplayFbInfo g_display_fb = {0x04000000u, 512u, 1};
 
 // Jump table snapshot for restoring after data-init copy clobbers BSS
 std::uint32_t g_jump_table_snapshot[12] = {};
@@ -57,6 +73,10 @@ static std::unordered_map<std::uint32_t, ThreadDesc> s_threads;
 // Thread entry address saved when sceKernelCreateThread is intercepted
 static std::uint32_t s_thread_entry = 0u;
 static std::uint32_t s_alloc_size = 0u;
+// Frame thread restart state: set when thread is started, used by ExitDeleteThread to restart
+static std::uint32_t s_frame_thread_entry = 0u;
+static std::uint32_t s_frame_thread_sp    = 0u;
+static std::uint32_t s_frame_count = 0u;
 
 // SysMem partition allocator — bump allocator in upper RAM
 static constexpr std::uint32_t kHeapBase = 0x09C00000u;
@@ -77,6 +97,16 @@ namespace { // resume anonymous namespace
 struct FrameBufInfo { std::uint32_t vaddr; std::uint32_t bufferwidth; std::uint32_t pixelformat; std::uint32_t sync; };
 static FrameBufInfo s_framebuf{};
 static std::uint32_t s_display_frame_count = 0u;
+
+// sceGu HLE write-pointer state
+static std::uint32_t s_gu_wp   = 0u;  // guest VA of next GE write slot
+static std::uint32_t s_gu_base = 0u;  // list base VA
+
+static void gu_emit(psprecomp::Runtime &rt2, std::uint32_t cmd) {
+    if (s_gu_wp == 0u || !rt2.memory().contains(s_gu_wp, 4u)) return;
+    rt2.memory().store32(s_gu_wp, cmd);
+    s_gu_wp += 4u;
+}
 
 // Single raw-function-pointer registered for every discovered syscall stub.
 // Dispatches by ctx.pc at call time.
@@ -204,6 +234,10 @@ void scan_and_register_stubs(psprecomp::Runtime &rt, const psprecomp::Elf32Image
             std::printf("[DISPLAY] SetFrameBuf vaddr=0x%08X bw=%u fmt=%u sync=%u frame=%u\n",
                         s_framebuf.vaddr, s_framebuf.bufferwidth, s_framebuf.pixelformat,
                         s_framebuf.sync, s_display_frame_count);
+        // Update global display fb info for present code
+        g_display_fb.vaddr  = ctx.gpr[4];
+        g_display_fb.stride = ctx.gpr[5];
+        g_display_fb.fmt    = static_cast<int>(ctx.gpr[6]);
         ctx.gpr[2] = 0u;
         ctx.pc = ctx.gpr[31];
     };
@@ -288,6 +322,30 @@ void scan_and_register_stubs(psprecomp::Runtime &rt, const psprecomp::Elf32Image
 
 void register_hle(psprecomp::Runtime &rt) {
     psprecomp::g_runtime_starvation_interval_fast = 0u;
+    // Install frame-complete hook: when a function returns via ra=0 (null-PC)
+    // while inside the render thread (after FUN_08933398 init), redirect to
+    // L_089333E0 to re-enter the per-frame render loop.
+    // Before the render thread starts, return 0 so runtime.run() stops and
+    // hle_run_next_thread() can be called.
+    psprecomp::g_frame_reset_sp = 0x09EF0000u; // render thread stack base
+    psprecomp::g_frame_complete_hook = []() -> std::uint32_t {
+        static bool s_render_thread_running = false;
+        static std::uint32_t s = 0u;
+        if (!s_render_thread_running) {
+            // First null-PC: main game thread has queued the render thread and exited.
+            // Let runtime.run() stop so hle_run_next_thread() can be called.
+            s_render_thread_running = true;
+            std::printf("[FRAME-RECOVERY] main thread done, stopping for render thread handoff\n");
+            std::fflush(stdout);
+            return 0u; // -> sentinel -> rt.stop() -> hle_run_next_thread()
+        }
+        // Subsequent null-PCs: inside the render thread, redirect through scheduler.
+        // 0x089333F0 calls the task scheduler (L_08933458) then enters L_0893354C,
+        // ensuring tasks run every frame. gpr[16] (callee-saved) holds the task list ptr.
+        if (++s <= 10u) std::printf("[FRAME-RECOVERY] null-PC in render thread -> 0x089333F0 (via scheduler)\n");
+        std::fflush(stdout);
+        return 0x089333F0u;
+    };
     rt.register_hle("IoFileMgrForUser", 0x109F50BC,
         [](psprecomp::Runtime &rt, psprecomp::AllegrexContext &ctx) {
             const std::string path = rt.memory().read_c_string(ctx.gpr[4]);
@@ -345,14 +403,22 @@ void register_hle(psprecomp::Runtime &rt) {
         }
     }, "hle_thread_exit");
 
-    rt.register_function(0x089C6000u, [](psprecomp::Runtime &rt, psprecomp::AllegrexContext &ctx) {
-        std::printf("[HLE] sceKernelExitDeleteThread(%d)\n", ctx.gpr[4]);
-        rt.stop("sceKernelExitDeleteThread");
+    rt.register_function(0x089C6000u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+        // sceKernelExitDeleteThread — PSP per-frame yield.
+        // The generated loop at L_08804278 calls this with ra=0x08804280.
+        // Return to ra so the frame loop continues at L_08804280.
+        static std::uint32_t s_xdt = 0u;
+        if (++s_xdt <= 5u) std::printf("[HLE] sceKernelExitDeleteThread(%d) -> nop-return ra=0x%08X #%u\n", ctx.gpr[4], ctx.gpr[31], s_xdt);
+        ctx.gpr[2] = 0u;
+        ctx.pc = ctx.gpr[31];
     }, "recomp_unit_exitdeletethread");
 
-    rt.register_function(0x089C6030u, [](psprecomp::Runtime &rt, psprecomp::AllegrexContext &ctx) {
-        std::printf("[HLE] sceKernelExitThread(%d)\n", ctx.gpr[4]);
-        rt.stop("sceKernelExitThread");
+    rt.register_function(0x089C6030u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+        // Same treatment.
+        static std::uint32_t s_xt = 0u;
+        if (++s_xt <= 5u) std::printf("[HLE] sceKernelExitThread(%d) -> nop-return ra=0x%08X #%u\n", ctx.gpr[4], ctx.gpr[31], s_xt);
+        ctx.gpr[2] = 0u;
+        ctx.pc = ctx.gpr[31];
     }, "recomp_unit_exitthread");
 
     // ThreadManForUser stubs
@@ -507,41 +573,15 @@ void register_hle(psprecomp::Runtime &rt) {
     }, "recomp_unit_geunsetcallback");
 
     // sceGeListEnQueue(list, stall, cbid, arg) -> list_id
-    rt.register_function(0x089C5A78u, [](psprecomp::Runtime &rt, psprecomp::AllegrexContext &ctx) {
+    rt.register_function(0x089C5A78u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
         static std::uint32_t s_list_id = 1u;
-        const std::uint32_t list  = ctx.gpr[4];
-        const std::uint32_t stall = ctx.gpr[5];
-        // Dump up to 3 "real" lists (skip init list of sequential-op zeros)
-        static std::uint32_t s_real = 0u;
-        if (s_real < 3u) {
-            const std::uint32_t phys       = list  & 0x1FFFFFFFu;
-            const std::uint32_t stall_phys = stall & 0x1FFFFFFFu;
-            if (rt.memory().contains(phys, 4u)) {
-                // Check if list has any non-trivial command
-                bool interesting = false;
-                for (std::uint32_t p = phys; p < phys + 4096u; p += 4u) {
-                    if (!rt.memory().contains(p, 4u)) break;
-                    const std::uint32_t c = rt.memory().load32(p);
-                    const std::uint8_t op = static_cast<std::uint8_t>(c >> 24);
-                    if (op == 0x0Fu) break;
-                    // Not interesting if arg==0 and op increments sequentially from 0
-                    if (c != 0u && op != static_cast<std::uint8_t>((p - phys) / 4u))
-                        { interesting = true; break; }
-                }
-                if (interesting) {
-                    ++s_real;
-                    std::printf("[GE] real list #%u phys=0x%08X stall=0x%08X\n",
-                                s_real, phys, stall_phys);
-                    const std::uint32_t end = stall_phys > phys ? stall_phys : phys + 8192u;
-                    for (std::uint32_t p = phys; p < end && p < phys + 65536u; p += 4u) {
-                        if (!rt.memory().contains(p, 4u)) break;
-                        const std::uint32_t cmd = rt.memory().load32(p);
-                        std::printf("  op=0x%02X arg=0x%06X\n", cmd >> 24, cmd & 0xFFFFFFu);
-                        if ((cmd >> 24) == 0x0Fu) break;
-                    }
-                }
-            }
-        }
+        static std::uint32_t s_enq = 0u;
+        const std::uint32_t list_phys  = ctx.gpr[4] & 0x1FFFFFFFu;
+        const std::uint32_t stall_phys = ctx.gpr[5] & 0x1FFFFFFFu;
+        psprecomp::g_ge_list_start    = list_phys;
+        psprecomp::g_ge_exec_cursor   = list_phys;
+        psprecomp::g_ge_list_executed = false;
+        if (++s_enq <= 6u) std::printf("[GE-ENQUEUE] list=0x%08X stall=0x%08X\n", list_phys, stall_phys);
         ctx.gpr[2] = s_list_id++;
         ctx.pc     = ctx.gpr[31];
     }, "recomp_unit_gelistenqueue");
@@ -556,7 +596,8 @@ void register_hle(psprecomp::Runtime &rt) {
     // sceGeListSync(listid, syncType) -> 0
     rt.register_function(0x089C5A48u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
         static std::uint32_t s_gls = 0u; ++s_gls;
-        if (s_gls <= 3u) std::printf("[HLE] sceGeListSync #%u ra=0x%08X\n", s_gls, ctx.gpr[31]);
+        if (s_gls <= 6u) std::printf("[HLE] sceGeListSync #%u list=0x%08X ra=0x%08X\n",
+            s_gls, psprecomp::g_ge_list_start, ctx.gpr[31]);
         ctx.gpr[2] = 0u;
         ctx.pc     = ctx.gpr[31];
     }, "recomp_unit_gelistsync");
@@ -580,7 +621,29 @@ void register_hle(psprecomp::Runtime &rt) {
     }, "recomp_unit_gecontinue");
 
     // sceGeListUpdateStallAddr(listid, stall) -> 0
-    rt.register_function(0x089C5A90u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+    // On PSP this tells the GE "I've written more DL commands up to 'stall', go execute them."
+    // We must execute from g_ge_exec_cursor up to new stall.
+    rt.register_function(0x089C5A90u, [](psprecomp::Runtime &rt, psprecomp::AllegrexContext &ctx) {
+        static std::uint32_t s_upd = 0u;
+        const std::uint32_t new_stall = ctx.gpr[5] & 0x1FFFFFFFu;
+        const std::uint32_t cursor    = psprecomp::g_ge_exec_cursor & 0x1FFFFFFFu;
+        if (++s_upd <= 6u)
+            std::printf("[GE-UPDATESTALL] #%u listid=%u stall=0x%08X cursor=0x%08X\n",
+                        s_upd, ctx.gpr[4], new_stall, cursor);
+        if (new_stall != 0u && new_stall > cursor &&
+            rt.memory().contains(cursor, 4u) && rt.memory().contains(new_stall - 4u, 4u)) {
+            const auto *dl_ptr = reinterpret_cast<const std::uint32_t *>(rt.memory().raw_pointer(cursor, 4u));
+            const auto *dl_end = reinterpret_cast<const std::uint32_t *>(rt.memory().raw_pointer(new_stall, 4u));
+            void *vram_ptr = rt.memory().raw_pointer(0x04000000u, 0x200000u);
+            const auto &mem_vec = rt.memory().bytes();
+            if (vram_ptr && dl_ptr && dl_end) {
+                if (s_upd <= 6u) std::printf("[GE-UPDATESTALL] executing cursor..stall\n");
+                d012::ge_exec(dl_ptr, dl_end, vram_ptr, 0x200000u, mem_vec.data(), mem_vec.size(), 0x08000000u);
+                psprecomp::g_ge_exec_cursor = new_stall;
+            }
+        } else if (new_stall == 0u && cursor != 0u && s_upd <= 6u) {
+            std::printf("[GE-UPDATESTALL] stall=0 (flush signal), cursor=0x%08X\n", cursor);
+        }
         ctx.gpr[2] = 0u;
         ctx.pc     = ctx.gpr[31];
     }, "recomp_unit_gelistupdatestall");
@@ -614,6 +677,262 @@ void register_hle(psprecomp::Runtime &rt) {
 
     // sceKernelGetSystemTimeLow, sceDisplayWaitVblankStartCB implemented
     // directly in generated_unit_0014.cpp labels to keep unit 14 AOT-chainable.
+
+    // ---- sceGu HLE stubs -------------------------------------------------------
+    // sceGu write-pointer: maintained as file-scope statics to avoid lambda capture issues.
+    // sceGuStart sets the base; drawing fns append GE command words.
+
+    // sceGuStart(int type, void *list)  [0x089C5780]
+    rt.register_function(0x089C5780u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+        const std::uint32_t list_va = ctx.gpr[5] & 0x1FFFFFFFu;
+        s_gu_base = list_va;
+        s_gu_wp   = list_va;
+        static std::uint32_t s_n = 0u;
+        if (++s_n <= 3u) std::printf("[sceGuStart] type=%u list=0x%08X\n", ctx.gpr[4], list_va);
+        ctx.gpr[2] = 0u;
+        ctx.pc     = ctx.gpr[31];
+    }, "hle_sceGuStart");
+
+    // sceGuFinish()  [0x089C5770, 0x089C5778]
+    // Writes END command and directly executes the accumulated GE list.
+    auto gu_finish_fn = [](psprecomp::Runtime &rt2, psprecomp::AllegrexContext &ctx) {
+        static std::uint32_t s_n = 0u;
+        if (++s_n <= 3u) std::printf("[sceGuFinish] wp=0x%08X base=0x%08X\n", s_gu_wp, s_gu_base);
+        if (s_gu_wp != 0u && rt2.memory().contains(s_gu_wp, 4u))
+            rt2.memory().store32(s_gu_wp, 0x0F000000u); // END
+        const std::uint32_t list_phys  = s_gu_base  & 0x1FFFFFFFu;
+        const std::uint32_t stall_phys = (s_gu_wp + 4u) & 0x1FFFFFFFu;
+        if (list_phys != 0u && stall_phys > list_phys &&
+            rt2.memory().contains(list_phys, 4u) && rt2.memory().contains(stall_phys - 4u, 4u)) {
+            const auto *dl_ptr = reinterpret_cast<const std::uint32_t *>(
+                rt2.memory().raw_pointer(list_phys, 4u));
+            const auto *dl_end = reinterpret_cast<const std::uint32_t *>(
+                rt2.memory().raw_pointer(stall_phys, 4u));
+            void *vram_ptr = rt2.memory().raw_pointer(0x04000000u, 0x200000u);
+            const auto &mem_vec = rt2.memory().bytes();
+            if (vram_ptr && dl_ptr && dl_end)
+                d012::ge_exec(dl_ptr, dl_end, vram_ptr, 0x200000u,
+                              mem_vec.data(), mem_vec.size(), 0x04000000u);
+        }
+        ctx.gpr[2] = 0u;
+        ctx.pc     = ctx.gpr[31];
+    };
+    rt.register_function(0x089C5770u, gu_finish_fn, "hle_sceGuFinish0");
+    rt.register_function(0x089C5778u, gu_finish_fn, "hle_sceGuFinish1");
+
+    // sceGuClear(flags)  [0x089C5630]
+    rt.register_function(0x089C5630u, [](psprecomp::Runtime &rt2, psprecomp::AllegrexContext &ctx) {
+        static std::uint32_t s_n = 0u;
+        if (++s_n <= 3u) std::printf("[sceGuClear] flags=0x%08X wp=0x%08X\n", ctx.gpr[4], s_gu_wp);
+        gu_emit(rt2, 0xD2000001u); // CLEARMODE on
+        gu_emit(rt2, 0x04000000u); // PRIM NOP (count=0)
+        gu_emit(rt2, 0xD2000000u); // CLEARMODE off
+        ctx.gpr[2] = 0u;
+        ctx.pc     = ctx.gpr[31];
+    }, "hle_sceGuClear");
+
+    // sceGuClearColor(color)  [0x089C5650]
+    rt.register_function(0x089C5650u, [](psprecomp::Runtime &rt2, psprecomp::AllegrexContext &ctx) {
+        static std::uint32_t s_n = 0u;
+        if (++s_n <= 3u) std::printf("[sceGuClearColor] color=0x%08X\n", ctx.gpr[4]);
+        gu_emit(rt2, 0x02000000u | (ctx.gpr[4] & 0xFFFFFFu));
+        gu_emit(rt2, 0x03000000u | ((ctx.gpr[4] >> 24) & 0xFFu));
+        ctx.gpr[2] = 0u;
+        ctx.pc     = ctx.gpr[31];
+    }, "hle_sceGuClearColor");
+
+    // sceGuClearDepth(depth)  [0x089C5688]
+    rt.register_function(0x089C5688u, [](psprecomp::Runtime &rt2, psprecomp::AllegrexContext &ctx) {
+        static std::uint32_t s_n = 0u;
+        if (++s_n <= 3u) std::printf("[sceGuClearDepth] depth=0x%04X\n", ctx.gpr[4]);
+        gu_emit(rt2, 0x55000000u | (ctx.gpr[4] & 0xFFFFu));
+        ctx.gpr[2] = 0u;
+        ctx.pc     = ctx.gpr[31];
+    }, "hle_sceGuClearDepth");
+
+    // sceGuDrawArray(prim, vtype, count, indices, vertices)  [0x089C56C0]
+    // a0=prim, a1=vtype, a2=count, a3=indices_ptr, [sp+16]=vertices_ptr
+    rt.register_function(0x089C56C0u, [](psprecomp::Runtime &rt2, psprecomp::AllegrexContext &ctx) {
+        const std::uint32_t prim  = ctx.gpr[4];
+        const std::uint32_t vtype = ctx.gpr[5];
+        const std::uint32_t count = ctx.gpr[6];
+        const std::uint32_t iptr  = ctx.gpr[7];
+        const std::uint32_t vptr  = rt2.memory().load32(ctx.gpr[29] + 16u);
+        static std::uint32_t s_n = 0u;
+        if (++s_n <= 6u) std::printf("[sceGuDrawArray] prim=%u vtype=0x%X count=%u iptr=0x%08X vptr=0x%08X\n",
+                                      prim, vtype, count, iptr, vptr);
+        const std::uint32_t vphys = vptr & 0x1FFFFFFFu;
+        const std::uint32_t iphys = iptr & 0x1FFFFFFFu;
+        gu_emit(rt2, 0xA0000000u | (vtype & 0xFFFFFFu)); // VTYPE
+        gu_emit(rt2, 0x10000000u | ((vphys >> 8) & 0xFF0000u)); // BASE
+        if (iphys != 0u)
+            gu_emit(rt2, 0x09000000u | (iphys & 0xFFFFFFu)); // IADDR
+        gu_emit(rt2, 0x01000000u | (vphys & 0xFFFFFFu)); // VADDR
+        gu_emit(rt2, 0x04000000u | ((prim & 0x7u) << 16) | (count & 0xFFFFu)); // PRIM
+        ctx.gpr[2] = 0u;
+        ctx.pc     = ctx.gpr[31];
+    }, "hle_sceGuDrawArray");
+
+    // Unknown sceGu stubs — log and NOP-return  [0x089C56E0, 5700, 5718, 5730]
+    auto gu_nop_fn = [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+        static std::uint32_t s_n = 0u;
+        if (++s_n <= 8u) std::printf("[sceGu-unk] va=0x%08X a0=0x%08X a1=0x%08X a2=0x%08X a3=0x%08X\n",
+                                      ctx.pc, ctx.gpr[4], ctx.gpr[5], ctx.gpr[6], ctx.gpr[7]);
+        ctx.gpr[2] = 0u;
+        ctx.pc     = ctx.gpr[31];
+    };
+    rt.register_function(0x089C56E0u, gu_nop_fn, "hle_sceGu56E0");
+    rt.register_function(0x089C5700u, gu_nop_fn, "hle_sceGu5700");
+    rt.register_function(0x089C5718u, gu_nop_fn, "hle_sceGu5718");
+    rt.register_function(0x089C5730u, gu_nop_fn, "hle_sceGu5730");
+
+    // Stub uncompiled functions in the 0x089DDxxx gap (called from FUN_0887801C init chain)
+    // 089DD4D0: one-time struct initializer for DAT_09ae7070 — stub returns 0, caller guards with flag
+    rt.register_function(0x089DD4D0u, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+        static bool s_once = false;
+        if (!s_once) { s_once = true;
+            std::printf("[STUB] 089DD4D0 init struct a0=0x%08X ra=0x%08X\n", ctx.gpr[4], ctx.gpr[31]);
+            std::fflush(stdout); }
+        ctx.gpr[2] = 0u;
+        ctx.pc = ctx.gpr[31];
+    }, "stub_089DD4D0");
+    rt.register_function(0x089E0B0Cu, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+        static bool s_once = false;
+        if (!s_once) { s_once = true;
+            std::printf("[STUB] 089E0B0C init struct a0=0x%08X ra=0x%08X\n", ctx.gpr[4], ctx.gpr[31]);
+            std::fflush(stdout); }
+        ctx.gpr[2] = 0u;
+        ctx.pc = ctx.gpr[31];
+    }, "stub_089E0B0C");
+
+    // FUN_08992F6C: linked-list push. *param_1 = DAT_09af6780; DAT_09af6780 = param_1.
+    // Compiled in unit_0012 but invoke_chained_call from unit_0015 can't cross units — provide HLE.
+    rt.register_function(0x08992F6Cu, [](psprecomp::Runtime &rt2, psprecomp::AllegrexContext &ctx) {
+        const std::uint32_t list_head_va = 0x09AF6780u;
+        const std::uint32_t param1 = ctx.gpr[4];
+        if (param1 && rt2.memory().contains(param1, 4u) && rt2.memory().contains(list_head_va, 4u)) {
+            const std::uint32_t head = rt2.memory().load32(list_head_va);
+            rt2.memory().store32(param1, head);
+            rt2.memory().store32(list_head_va, param1);
+        }
+        ctx.gpr[2] = 0u;
+        ctx.pc = ctx.gpr[31];
+    }, "hle_FUN_08992F6C");
+
+    // FUN_0883DFA8: INIT function — calls FUN_08882950, FUN_0883F014, FUN_08992F6C.
+    // Cross-unit invoke_chained_call chain breaks; HLE does equivalent work directly.
+    rt.register_function(0x0883DFA8u, [](psprecomp::Runtime &rt2, psprecomp::AllegrexContext &ctx) {
+        static bool s_once = false;
+        if (!s_once) { s_once = true; std::printf("[HLE] FUN_0883DFA8 init\n"); std::fflush(stdout); }
+        // FUN_0883F014(DAT_09AFE820): sets fields at +0x5e4=100, +0x5e8=0, +0x5ec=0, +0x630=0
+        const std::uint32_t p = 0x09AFE820u;
+        if (rt2.memory().contains(p + 0x5e4u, 4u)) {
+            rt2.memory().store32(p + 0x5e4u, 100u);
+            rt2.memory().store32(p + 0x5e8u, 0u);
+            rt2.memory().store32(p + 0x5ecu, 0u);
+            rt2.memory().store32(p + 0x630u, 0u);
+        }
+        // FUN_08992F6C(&DAT_089D4948): linked-list push
+        const std::uint32_t list_head_va = 0x09AF6780u;
+        const std::uint32_t param1 = 0x089D4948u;
+        if (rt2.memory().contains(param1, 4u) && rt2.memory().contains(list_head_va, 4u)) {
+            const std::uint32_t head = rt2.memory().load32(list_head_va);
+            rt2.memory().store32(param1, head);
+            rt2.memory().store32(list_head_va, param1);
+        }
+        ctx.gpr[2] = 0u;
+        ctx.pc = ctx.gpr[31];
+    }, "hle_FUN_0883DFA8");
+
+    // FUN_08874508: init — calls FUN_08993560, sets floats in 09b48xxx, calls FUN_08992F6C
+    rt.register_function(0x08874508u, [](psprecomp::Runtime &rt2, psprecomp::AllegrexContext &ctx) {
+        static bool s_once = false;
+        if (!s_once) { s_once = true; std::printf("[HLE] FUN_08874508 init\n"); std::fflush(stdout); }
+        const std::uint32_t base = 0x09B48210u;
+        const float f_max = 255.9375f; // 0x437f0000
+        std::uint32_t fmax_bits = 0x437f0000u;
+        auto st = [&](std::uint32_t off, std::uint32_t v) { if (rt2.memory().contains(base+off,4u)) rt2.memory().store32(base+off,v); };
+        st(0u,0u); st(4u,0u); st(8u,0u); st(12u,0u); st(16u,0u); st(20u,0u); st(24u,0u);
+        st(28u,fmax_bits); st(32u,fmax_bits); st(36u,fmax_bits); st(40u,fmax_bits);
+        st(44u,0u); st(48u,fmax_bits); st(52u,fmax_bits); st(56u,fmax_bits); st(60u,fmax_bits);
+        // FUN_08992F6C(&DAT_089D6018)
+        const std::uint32_t lh = 0x09AF6780u, p1 = 0x089D6018u;
+        if (rt2.memory().contains(p1,4u)&&rt2.memory().contains(lh,4u)) { rt2.memory().store32(p1, rt2.memory().load32(lh)); rt2.memory().store32(lh,p1); }
+        ctx.gpr[2] = 0u; ctx.pc = ctx.gpr[31];
+    }, "hle_FUN_08874508");
+
+    // FUN_0888E65C: init — calls FUN_088698FC, calls FUN_08992F6C
+    rt.register_function(0x0888E65Cu, [](psprecomp::Runtime &rt2, psprecomp::AllegrexContext &ctx) {
+        static bool s_once = false;
+        if (!s_once) { s_once = true; std::printf("[HLE] FUN_0888E65C init\n"); std::fflush(stdout); }
+        // FUN_08992F6C(&DAT_089D6A98)
+        const std::uint32_t lh = 0x09AF6780u, p1 = 0x089D6A98u;
+        if (rt2.memory().contains(p1,4u)&&rt2.memory().contains(lh,4u)) { rt2.memory().store32(p1, rt2.memory().load32(lh)); rt2.memory().store32(lh,p1); }
+        ctx.gpr[2] = 0u; ctx.pc = ctx.gpr[31];
+    }, "hle_FUN_0888E65C");
+
+    // FUN_0887801C: subsystem registry — inits 40+ subsystems and stores their pointers.
+    // All constructors (func_0x089DDxxx, func_0x08ACxxxx etc) are uncompiled gaps.
+    // HLE: skip all constructors, just write the pointer assignments the game reads later.
+    rt.register_function(0x0887801Cu, [](psprecomp::Runtime &rt2, psprecomp::AllegrexContext &ctx) {
+        static bool s_once = false;
+        if (!s_once) { s_once = true; std::printf("[HLE] FUN_0887801C subsystem registry\n"); std::fflush(stdout); }
+        auto store = [&](std::uint32_t dst, std::uint32_t src) {
+            if (rt2.memory().contains(dst, 4u)) rt2.memory().store32(dst, src);
+        };
+        // All _DAT_xxx = &DAT_yyy pointer assignments from FUN_0887801C pseudocode:
+        store(0x089E09C0u, 0x09AE7070u); store(0x089E75C4u, 0x09AE6F00u);
+        store(0x08AC7500u, 0x09AE6DA0u); store(0x08B01CF8u, 0x09AE6C40u);
+        store(0x08B243C0u, 0x09AE6AF0u); store(0x08AC4560u, 0x09AE6990u);
+        store(0x08B22E98u, 0x09AE6840u); store(0x08B1CB00u, 0x09AE66F0u);
+        store(0x08ABB9E4u, 0x09AE65A0u); store(0x08B25044u, 0x09AE6450u);
+        store(0x08B29CF8u, 0x09AE62F0u); store(0x08B32D90u, 0x09AE61A0u);
+        store(0x08A457ECu, 0x09AE6030u); store(0x08A457F0u, 0x09AE5EE0u);
+        store(0x08A35A00u, 0x09AE5E84u); store(0x08A0B6A0u, 0x09AE5D30u);
+        store(0x089E75C8u, 0x09AE5BE0u); store(0x08A23FF0u, 0x09AE5A50u);
+        store(0x089E9D38u, 0x09AE58A0u); store(0x08A4C0FCu, 0x09AE5740u);
+        store(0x08A4FFF4u, 0x09AE56D4u); store(0x08A51CBCu, 0x09AE5674u);
+        store(0x08AA3F44u, 0x09AE4680u); store(0x08A6D710u, 0x09AE43F0u);
+        store(0x08A6D7E0u, 0x09AE43E4u); store(0x08A8B7A8u, 0x09AE40D0u);
+        store(0x08A87EACu, 0x09AE3F70u); store(0x08B54058u, 0x09AE3E10u);
+        store(0x08A96A28u, 0x09AE3E04u); store(0x08B41CC0u, 0x09AE3D2Cu);
+        store(0x08B42088u, 0x09AE3CECu); store(0x08B42C28u, 0x09AE3CE0u);
+        store(0x08B42288u, 0x09AE3CD4u); store(0x08B44F08u, 0x09AE3CBCu);
+        store(0x08B45878u, 0x09AE3CB0u); store(0x08B438C0u, 0x09AE3CA4u);
+        store(0x08B426B0u, 0x09AE3C90u); store(0x08B42A98u, 0x09AE3C84u);
+        store(0x08B54C38u, 0x09AE3B20u); store(0x08B59230u, 0x09AE3B0Cu);
+        // Non-underscore DAT_ assignments:
+        store(0x089D7F20u, 0x09AE6EECu); store(0x089D7F10u, 0x09AE6EE4u);
+        ctx.gpr[2] = 0u;
+        ctx.pc = ctx.gpr[31];
+    }, "hle_FUN_0887801C");
+
+    // FUN_08890780: init — clears 3 words at DAT_09b491f8, then FUN_08992F6C(&DAT_089d6ab0)
+    rt.register_function(0x08890780u, [](psprecomp::Runtime &rt2, psprecomp::AllegrexContext &ctx) {
+        const std::uint32_t p = 0x09B491F8u;
+        if (rt2.memory().contains(p, 16u)) {
+            rt2.memory().store32(p + 0u, 0u);
+            rt2.memory().store32(p + 4u, 0u);
+            rt2.memory().store32(p + 12u, 0u);
+        }
+        const std::uint32_t lh = 0x09AF6780u, p1 = 0x089D6AB0u;
+        if (rt2.memory().contains(p1, 4u) && rt2.memory().contains(lh, 4u)) {
+            rt2.memory().store32(p1, rt2.memory().load32(lh));
+            rt2.memory().store32(lh, p1);
+        }
+        ctx.gpr[2] = 0u; ctx.pc = ctx.gpr[31];
+    }, "hle_FUN_08890780");
+
+    // FUN_088A4168: init — FUN_08993560 (allocates array at DAT_09b4d3b0), then FUN_08992F6C(&DAT_089d6d3c)
+    // FUN_08993560 / FUN_08993300: array allocator — stub as no-op (array at 09b4d3b0 stays zeroed)
+    rt.register_function(0x088A4168u, [](psprecomp::Runtime &rt2, psprecomp::AllegrexContext &ctx) {
+        const std::uint32_t lh = 0x09AF6780u, p1 = 0x089D6D3Cu;
+        if (rt2.memory().contains(p1, 4u) && rt2.memory().contains(lh, 4u)) {
+            rt2.memory().store32(p1, rt2.memory().load32(lh));
+            rt2.memory().store32(lh, p1);
+        }
+        ctx.gpr[2] = 0u; ctx.pc = ctx.gpr[31];
+    }, "hle_FUN_088A4168");
 }
 
 static std::uint32_t s_last_addr = 0u;
@@ -721,6 +1040,9 @@ void hle_run_next_thread(psprecomp::Runtime &rt) {
     ctx.gpr[26] = 0x09EE0000u;
     ctx.gpr[28] = 0x08B6B260u;
     ctx.gpr[31] = 0x00000001u;
+    s_frame_thread_entry = td.entry;
+    s_frame_thread_sp    = ctx.gpr[29];
+    psprecomp::g_frame_reset_sp = ctx.gpr[29];
     std::printf("[HLE] Thread ctx before run: sp=0x%08X ra=0x%08X\n", ctx.gpr[29], ctx.gpr[31]);
     for (std::uint32_t a = 0x09EC0000u; a < 0x09EFF000u; a += 4u)
         rt.memory().store32(a, 0x00000001u);

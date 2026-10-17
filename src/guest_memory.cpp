@@ -88,14 +88,18 @@ std::uint32_t GuestMemory::vram_size() const noexcept { return static_cast<std::
 bool GuestMemory::is_vram_window(std::uint32_t canonical_address) const noexcept {
     // Standard VRAM mirrors: 0x04000000–0x04800000
     // Write-combine aperture: 0x0C000000 (canonical of 0x4C000000, top-3 bits stripped)
+    // Kernel VRAM alias: 0x1F800000 (canonical of 0xFF800000) — PSP kernel maps VRAM here
     return (canonical_address >= kVramPhysicalBase &&
             canonical_address < kVramPhysicalBase + kVramAddressSpan) ||
-           (canonical_address >= 0x0C000000u &&
-            canonical_address < 0x0C000000u + kVramAddressSpan);
+    (canonical_address >= 0x0C000000u &&
+     canonical_address < 0x0C000000u + 0x04000000u) ||
+           (canonical_address >= 0x1F800000u &&
+            canonical_address < 0x1F800000u + kVramAddressSpan);
 }
 
 std::size_t GuestMemory::vram_offset(std::uint32_t canonical_address) const noexcept {
-    const std::uint32_t base = (canonical_address >= 0x0C000000u) ? 0x0C000000u : kVramPhysicalBase;
+    const std::uint32_t base = (canonical_address >= 0x1F800000u) ? 0x1F800000u :
+                               (canonical_address >= 0x0C000000u) ? 0x0C000000u : kVramPhysicalBase;
     return static_cast<std::size_t>((canonical_address - base) & (kVramSize - 1u));
 }
 
@@ -114,7 +118,8 @@ bool GuestMemory::contains(std::uint32_t address, std::size_t length) const noex
     const std::uint64_t end = static_cast<std::uint64_t>(c) + static_cast<std::uint64_t>(length);
     if (is_vram_window(c)) {
         const std::uint32_t vbase = (c >= 0x0C000000u) ? 0x0C000000u : kVramPhysicalBase;
-        if (end <= static_cast<std::uint64_t>(vbase) + kVramAddressSpan)
+    const std::uint32_t span = (vbase == 0x0C000000u) ? 0x04000000u : kVramAddressSpan;
+        if (end <= static_cast<std::uint64_t>(vbase) + span)
             return true;
     }
     if (c >= kPhysicalBase && end <= static_cast<std::uint64_t>(kPhysicalBase) + bytes_.size())
@@ -224,6 +229,13 @@ void GuestMemory::aot_store16_slow(std::uint32_t address, std::uint16_t value) {
 void GuestMemory::aot_store32_slow(std::uint32_t address, std::uint32_t value) {
     if (write_watch_enabled_) { store32(address, value); return; }
     const std::uint32_t c = remap_uncached_ram(canonical(address));
+    // Trace writes near the GE ring buffer (VRAM 0x8000-0x44000)
+    if (is_vram_window(c)) {
+        const std::size_t voff = vram_offset(c);
+        static std::uint32_t s_rb = 0;
+        if (voff >= 0x8000u && voff < 0x44000u && ++s_rb <= 8u)
+            std::printf("[VRAM-RB-WR] voff=0x%05zX val=0x%08X\n", voff, value);
+    }
     std::vector<std::uint8_t> *data = nullptr;
     std::size_t offset = 0u;
     if (is_vram_window(c)) { data = &vram_; offset = vram_offset(c); }
