@@ -36,6 +36,14 @@ set(D012_GENERATED
     "${D012_PROFILE_DIR}/generated/overlay_menu/generated_unit_0001.cpp"
     "${D012_PROFILE_DIR}/generated/overlay_menu/generated_unit_0002.cpp"
     "${D012_PROFILE_DIR}/generated/overlay_menu/generated_unit_0003.cpp"
+"${D012_PROFILE_DIR}/generated/overlay_menu/generated_unit_0004.cpp"
+"${D012_PROFILE_DIR}/generated/overlay_menu/generated_unit_0005.cpp"
+"${D012_PROFILE_DIR}/generated/overlay_menu/generated_unit_0006.cpp"
+"${D012_PROFILE_DIR}/generated/overlay_menu/generated_unit_0007.cpp"
+"${D012_PROFILE_DIR}/generated/overlay_menu/generated_unit_0008.cpp"
+"${D012_PROFILE_DIR}/generated/overlay_menu/generated_unit_0009.cpp"
+"${D012_PROFILE_DIR}/generated/overlay_menu/generated_unit_0010.cpp"
+"${D012_PROFILE_DIR}/generated/overlay_menu/generated_unit_0011.cpp"
     "${D012_PROFILE_DIR}/generated/overlay_menu/target_registry.cpp"
 )
 

@@ -30,4 +30,9 @@ void ovl_menu_recomp_unit_0010(Runtime &, AllegrexContext &);
 void ovl_menu_recomp_unit_0010_entry(Runtime &, AllegrexContext &, std::uint16_t, GuestMemory::AotFastView &);
 void ovl_menu_recomp_unit_0011(Runtime &, AllegrexContext &);
 void ovl_menu_recomp_unit_0011_entry(Runtime &, AllegrexContext &, std::uint16_t, GuestMemory::AotFastView &);
+// Generator-emitted cross-unit targets that are referenced by the recovered
+// overlay but do not have standalone bodies in the current split output.
+void ovl_menu_recomp_unit_0012(Runtime &, AllegrexContext &);
+void ovl_menu_recomp_unit_0073(Runtime &, AllegrexContext &);
+void ovl_menu_recomp_unit_0113(Runtime &, AllegrexContext &);
 } // namespace psprecomp

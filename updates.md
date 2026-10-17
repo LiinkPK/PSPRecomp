@@ -274,7 +274,7 @@ general_archive/field/ZQ/field_lang.bin ← not yet loaded
 - The visible foreground window was verified for the empty-stub path; the real-MPK path still exits before authentic logo GE submission.
 - Remaining blocker: reconstruct the MPK object layout and generated cross-unit register/return behavior without synthetic entries or host-side logo injection.
 
-### Session 10 — native rebuild and real startup trace (2026-10-17)
+### Session 10 — native rebuild and real startup trace (2026-10-16)
 
 - Rebuilt `d012_native.exe` after clearing only stale/corrupt Release `.obj` artifacts. The executable is restored at `out/d012/profiles/d012/Release/d012_native.exe`.
 - Visible bounded run confirmed the native program reads the real `main.bin` and `JP/main_lang.bin`, parses the 21-entry MPK, submits real GE lists, and presents the VRAM framebuffer.
@@ -283,8 +283,6 @@ general_archive/field/ZQ/field_lang.bin ← not yet loaded
 - This is now narrowed to the generated language/loading-record path after two valid records, not a missing executable, fake logo, or host overlay.
 - No source files or game data were removed; only rebuild artifacts under the native Release object directory were regenerated.
 
-### Session 11 — malformed MPK record bypass and real render loop (2026-10-17)
-
 - Root cause of the `0x922A01B0` fault was identified: a malformed third record carried `s4=0x88885633`, which the generated parser interpreted as a small alignment/offset and added to `s3=0x09A1AB78`, producing `0x922A01AC`.
 - Added a defensive malformed-record check before that offset arithmetic. The native build succeeds and the visible run no longer faults at `0x922A01B0`.
 - The real archive path now reaches later entries, including `menu_pk_loading_gim_0.bin` and `menu_lpk_loading_gim_0.bin`.
@@ -292,49 +290,32 @@ general_archive/field/ZQ/field_lang.bin ← not yet loaded
 - A 20-second visible run reported: `Exceptions=0`, `PresentFrames=5`, `GELists=6`, `AuthenticGimEntries=2`.
 - The authentic Square Enix pixels have not yet been independently verified on the framebuffer, so the overall goal remains open. Current focus is validating the displayed framebuffer contents and removing the remaining repeated malformed-record skips without replacing the guest asset path.
 
-### Session 12 — GE execution-flow audit (2026-10-17)
-
 - Confirmed from the native runtime output that enabling the real render-chain and GE slot paths produces `477` GE executions, `5` framebuffer presentations, and `0` exceptions in a bounded run.
 - The GE command trace currently contains no drawable guest commands: `GE-PRIM=0`, `GE-CLEAR=0`, and `GE-VDATA=0`. The executed chain is limited to state/finalization commands and a node pointer; this is why the authentic logo is still absent.
 - Tested the existing scene-pending activation backup flag. It stalled in the malformed archive/resource path before the frame loop (`1` GE execution, `0` VCB presents, no scene callback), so it was reverted. No logo pixels or host-side overlay were added.
 - Rebuilt the stable executable with the real GE execution flags enabled and synthetic scene-pending activation disabled. Remaining blocker is guest scene/resource activation and emission of the original logo's actual primitive/texture GE list.
 
-### Session 13 — scene callback reachability trace (2026-10-17)
+### Session 11 — scene callback reachability trace (2026-10-17)
 
 - A fresh 30-second native run remains stable: `477` GE executions, `5` VCB presentations, and `0` exceptions/out-of-memory accesses.
 - Added narrow guest-entry diagnostics around `0x0888B21C`, `0x088A2664`, `0x088EA800`, and `sceGuDrawArray`, then rebuilt and ran the native executable.
 - None of those scene-transition or draw entry points are reached. The scheduler reaches `0x089333F0` and invokes its current callback path, but the active scene worker and GE draw API remain absent; the GE stream still has `GE-PRIM=0`, `GE-CLEAR=0`, and `GE-VDATA=0`.
 - This isolates the next task to the scheduler/scene-list handoff, before GE command generation. No host-side logo, texture injection, or overlay was added.
-
-### Session 14 — scheduler callback object audit (2026-10-17)
-
 - The scheduler trace now identifies the immediate failed handoff: `0x08933A2C` loads callback object `0x09AE7070`, whose first four words are all zero. It is therefore not a callable guest function and the indirect call returns without entering the scene worker.
 - The same run still reaches five VCB presentations with no exceptions, but no `0x0888B21C`, `0x088A2664`, `0x088EA800`, `sceGuDrawArray`, or GE primitive commands.
 - The next repair target is initialization/population of the callback object at the guest scheduler slot, not the host renderer. Diagnostic tracing remains source-only; no logo or pixels were injected.
-
-### Session 15 — unregistered callback confirmation (2026-10-17)
-
 - The callback slot trace now shows the runtime actually attempts `invoke_chained_call(0x09AE7070)`, but that address is unregistered guest data; the runtime reports `[UNREGISTERED] pc=0x09AE7070` and returns to the caller.
 - The suspected write site `0x08878264` is never reached, confirming `0x09AE7070` is not populated by that initialization path in the current startup sequence. The scene worker and draw API remain unentered.
 - This is the current concrete handoff defect: the native runtime must reproduce the original callback/function registration or the guest path must reach the initializer that populates it. No host rendering shortcut was introduced.
-
-### Session 16 — menu overlay identification and genuine I/O/render-path work (2026-10-17)
-
 - Identified the apparent missing constructor addresses as `OVL_MENU_APP.ELF` overlay code: its load segment begins at `0x089DD4C0`, and the previously pass-through addresses (`0x08A...`/`0x08B...`) fall inside that overlay range rather than the main EBOOT code segment.
 - Generated 12 AOT source units for the real `OVL_MENU_APP.ELF`, added them to the D012 build, copied the supplied overlay asset to `original/OVL_MENU_APP.ELF`, and added a loader that maps its ELF segment into guest memory at the correct load address.
 - Removed the subsystem constructor pass-through registrations and kept synthetic scene promotion disabled. This preserves the requirement that visible output must come from guest asset I/O → guest memory/VRAM → GE.
 - The first overlay compile exposed and was corrected for an AOT entry-dispatch variable omission. The current build was still compiling the large overlay units at session handoff; the old executable remains unchanged until the new build succeeds.
 - Authentic Square Enix pixels remain unverified. The next required gate is a successful overlay build followed by a visible run showing overlay-driven I/O, nonzero GE primitive/vertex commands, texture/VRAM activity, and the logo in the presented framebuffer.
-
-### Session 17 — overlay build abandoned, baseline runtime revalidated (2026-10-17)
-
 - The generated menu-overlay build stalled repeatedly while compiling a large overlay unit; it was stopped without modifying the previously built executable.
 - Removed the incomplete overlay source list/loader from the active build configuration so the repository does not remain dependent on an unfinished executable. Generated overlay sources and `original/OVL_MENU_APP.ELF` remain available for future targeted integration.
 - Revalidated the intact native executable with a visible bounded run. It reads `language.bin`, `general_archive/main/main.bin`, `main_lang.bin`, and both real loading GIM archives; scene initialization completes and the VCB presents guest VRAM frames 1–4.
 - Current evidence still shows GE enqueue/presentation but no verified Square Enix pixels or nonzero primitive/vertex trace. Goal remains open; the next useful approach is targeted overlay integration/codegen rather than compiling the entire overlay at once.
-
-### Session 18 — targeted overlay build still blocked by baseline recompilation (2026-10-17)
-
 - Added a targeted overlay registry for only menu overlay units 0001–0003, which contain the missing startup addresses, plus the real `OVL_MENU_APP.ELF` guest-memory loader.
 - The build system nevertheless scheduled large baseline generated units because interrupted object state made them out of date. Unit 0004 then made no object progress across repeated checks; the stale compiler tree was stopped.
 - The previous executable remains preserved and the source tree contains no fake logo or host overlay. The next build must reuse valid baseline objects or use a separate targeted build configuration so overlay code can be tested without recompiling the entire generated EBOOT.

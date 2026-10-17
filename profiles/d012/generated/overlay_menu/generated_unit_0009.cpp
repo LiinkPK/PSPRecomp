@@ -10525,8 +10525,7 @@ L_08B00088:
 L_08B00090:
     ctx.gpr[31] = (0x08B00098u);
     // vflush: architectural no-op that retains VFPU prefixes
-    if (rt.invoke_chained_direct<&ovl_menu_recomp_unit_0073, 73u>(ctx, &aot_mem) && ctx.pc == 0x08B00098u) goto L_08B00098;
-    return;
+    rt.unsupported(0x08B00098u, 0x0000FFFFu, "missing overlay target 0073"); return;
 L_08B00098:
     rt.unsupported(0x08B00098u, 0x0000FFFFu, "special? not lowered yet"); return;
 L_08B000A8:
@@ -10920,8 +10919,7 @@ L_08B00EF8:
 L_08B00F00:
     ctx.gpr[31] = (0x08B00F08u);
     // vflush: architectural no-op that retains VFPU prefixes
-    if (rt.invoke_chained_direct<&ovl_menu_recomp_unit_0113, 113u>(ctx, &aot_mem) && ctx.pc == 0x08B00F08u) goto L_08B00F08;
-    return;
+    rt.unsupported(0x08B00F08u, 0x0000FFFFu, "missing overlay target 0113"); return;
 L_08B00F08:
     rt.unsupported(0x08B00F0Cu, 0x0E5E0C79u, "control flow in delay slot"); return;
 L_08B00F10:
@@ -10929,8 +10927,7 @@ L_08B00F10:
 L_08B00F18:
     ctx.gpr[31] = (0x08B00F20u);
     // vflush: architectural no-op that retains VFPU prefixes
-    if (rt.invoke_chained_direct<&ovl_menu_recomp_unit_0113, 113u>(ctx, &aot_mem) && ctx.pc == 0x08B00F20u) goto L_08B00F20;
-    return;
+    rt.unsupported(0x08B00F20u, 0x0000FFFFu, "missing overlay target 0113"); return;
 L_08B00F20:
     rt.unsupported(0x08B00F20u, 0x007FFFFFu, "special? not lowered yet"); return;
 L_08B00F88:
